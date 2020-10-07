@@ -19,7 +19,7 @@ var (
 
 // LoadConf parses and validates stdin netconf and returns NetConf object
 func LoadConf(bytes []byte) (*localtypes.NetConf, error) {
-	n := &localtypes.NetConf{}
+	n := &localtypes.NetConf{Debug: false}
 	if err := json.Unmarshal(bytes, n); err != nil {
 		return nil, fmt.Errorf("LoadConf(): failed to load netconf: %v", err)
 	}

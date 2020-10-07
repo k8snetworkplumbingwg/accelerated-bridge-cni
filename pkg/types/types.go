@@ -32,6 +32,7 @@ func (vs *VfState) FillFromVfInfo(info *netlink.VfInfo) {
 // NetConf extends types.NetConf for sriov-cni
 type NetConf struct {
 	types.NetConf
+	Debug         bool    `json:"debug,omitempty"` // enables debug log level
 	OrigVfState   VfState // Stores the original VF state as it was prior to any operations done during cmdAdd flow
 	Master        string
 	MAC           string
