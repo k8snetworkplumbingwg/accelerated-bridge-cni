@@ -56,7 +56,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}()
 	if err != nil {
-		return fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
+		return fmt.Errorf("failed to load netconf: %v", err)
 	}
 
 	if netConf.Debug == true {
@@ -65,7 +65,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	envArgs, err := getEnvArgs(args.Args)
 	if err != nil {
-		return fmt.Errorf("SRIOV-CNI failed to parse args: %v", err)
+		return fmt.Errorf("failed to parse args: %v", err)
 	}
 
 	if envArgs != nil {
@@ -89,8 +89,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 	defer netns.Close()
 
 	m := manager.NewManager()
+	if err = m.AttachRepresentor(netConf); err != nil {
+		return fmt.Errorf("failed to attach representor: %v", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = m.DetachRepresentor(netConf)
+		}
+	}()
+
 	if err := m.ApplyVFConfig(netConf); err != nil {
-		return fmt.Errorf("SRIOV-CNI failed to configure VF %q", err)
+		return fmt.Errorf("failed to configure VF %q", err)
 	}
 
 	result := &current.Result{}
@@ -193,6 +202,10 @@ func cmdDel(args *skel.CmdArgs) error {
 	}()
 
 	m := manager.NewManager()
+
+	if err = m.DetachRepresentor(netConf); err != nil {
+		log.Warn().Msgf("failed to detach representor: %v", err)
+	}
 
 	if netConf.IPAM.Type != "" {
 		err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
