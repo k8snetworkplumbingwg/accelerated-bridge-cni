@@ -2,4 +2,4 @@
 set -e
 
 ## Build docker image
-docker build -t mellanox/sriov-cni-test -f ../Dockerfile  ../
+docker build -t mellanox/accelerated-bridge-cni-test -f ../Dockerfile  ../

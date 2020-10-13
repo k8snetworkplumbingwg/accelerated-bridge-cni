@@ -14,7 +14,7 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/DmytroLinkin/switchdev-cni/pkg/config"
-	"github.com/DmytroLinkin/switchdev-cni/pkg/sriov"
+	"github.com/DmytroLinkin/switchdev-cni/pkg/manager"
 	"github.com/DmytroLinkin/switchdev-cni/pkg/utils"
 )
 
@@ -74,8 +74,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	sm := sriov.NewSriovManager()
-	if err := sm.ApplyVFConfig(netConf); err != nil {
+	m := manager.NewManager()
+	if err := m.ApplyVFConfig(netConf); err != nil {
 		return fmt.Errorf("SRIOV-CNI failed to configure VF %q", err)
 	}
 
@@ -85,7 +85,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		Sandbox: netns.Path(),
 	}}
 
-	macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
+	macAddr, err = m.SetupVF(netConf, args.IfName, args.ContainerID, netns)
 	defer func() {
 		if err != nil {
 			err := netns.Do(func(_ ns.NetNS) error {
@@ -93,7 +93,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 				return err
 			})
 			if err == nil {
-				sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+				m.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
 			}
 		}
 	}()
@@ -166,7 +166,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 	}()
 
-	sm := sriov.NewSriovManager()
+	m := manager.NewManager()
 
 	if netConf.IPAM.Type != "" {
 		err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
@@ -191,11 +191,11 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if err = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
+	if err = m.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
 		return err
 	}
 
-	if err := sm.ResetVFConfig(netConf); err != nil {
+	if err := m.ResetVFConfig(netConf); err != nil {
 		return fmt.Errorf("cmdDel() error reseting VF: %q", err)
 	}
 
