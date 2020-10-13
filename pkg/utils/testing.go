@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 )
 
 func check(e error) {
@@ -20,13 +19,12 @@ func check(e error) {
 }
 
 type tmpSysFs struct {
-	dirRoot      string
-	dirList      []string
-	fileList     map[string][]byte
-	netSymlinks  map[string]string
-	devSymlinks  map[string]string
-	vfSymlinks   map[string]string
-	originalRoot *os.File
+	dirRoot     string
+	dirList     []string
+	fileList    map[string][]byte
+	netSymlinks map[string]string
+	devSymlinks map[string]string
+	vfSymlinks  map[string]string
 }
 
 var ts = tmpSysFs{
@@ -73,16 +71,12 @@ var ts = tmpSysFs{
 
 // CreateTmpSysFs create mock sysfs for testing
 func CreateTmpSysFs() error {
-	originalRoot, err := os.Open("/")
-	ts.originalRoot = originalRoot
-
-	tmpdir, err := ioutil.TempDir("/tmp", "sriovplugin-testfiles-")
+	tmpdir, err := ioutil.TempDir("/tmp", "sriov-plugin-testfiles-")
 	if err != nil {
 		return err
 	}
 
 	ts.dirRoot = tmpdir
-	//syscall.Chroot(ts.dirRoot)
 
 	for _, dir := range ts.dirList {
 		if err := os.MkdirAll(filepath.Join(ts.dirRoot, dir), 0755); err != nil {
@@ -90,7 +84,6 @@ func CreateTmpSysFs() error {
 		}
 	}
 	for filename, body := range ts.fileList {
-
 		if err := ioutil.WriteFile(filepath.Join(ts.dirRoot, filename), body, 0644); err != nil {
 			return err
 		}
@@ -131,17 +124,7 @@ func createSymlinks(link, target string) error {
 
 // RemoveTmpSysFs removes mocked sysfs
 func RemoveTmpSysFs() error {
-	err := ts.originalRoot.Chdir()
-	if err != nil {
-		return err
-	}
-	if err = syscall.Chroot("."); err != nil {
-		return err
-	}
-	if err = ts.originalRoot.Close(); err != nil {
-		return err
-	}
-	if err = os.RemoveAll(ts.dirRoot); err != nil {
+	if err := os.RemoveAll(ts.dirRoot); err != nil {
 		return err
 	}
 	return nil

@@ -1,17 +1,18 @@
 language: go
-sudo: required
 
 go:
-  - "1.12"
+  - 1.13.x
+
 env:
-  global:
-  - PATH=$GOROOT/bin:$GOPATH/bin:$PATH
+  - IMAGE_NAME=mellanox/sriov-cni-test
+
+    #before_script:
+    #- go get github.com/mattn/goveralls
 
 script:
-  - make lint
-  - sudo -E env "PATH=$PATH" make test && sudo make clean
-  - make build
-  - sudo -E env "PATH=$PATH" make clean 
+  #- make lint
+  - make test-coverage
+  #- goveralls -coverprofile=sriov-cni.cover -service=travis-ci
   - make image
 
 before_deploy:
@@ -21,7 +22,7 @@ deploy:
   # Push image to Dockerhub on merge to master
   - provider: script
     skip_cleanup: true
-    script: docker push nfvpe/sriov-cni
+    script: docker push $IMAGE_NAME:latest
     on:
       branch: master
   # Push image to Dockerhub on tag
@@ -29,9 +30,8 @@ deploy:
     skip_cleanup: true
     script: >
       bash -c '
-      docker tag nfvpe/sriov-cni nfvpe/sriov-cni:$TRAVIS_TAG;
-      docker push nfvpe/sriov-cni:$TRAVIS_TAG;
-      echo foo'
+      docker tag $IMAGE_NAME $IMAGE_NAME:$TRAVIS_TAG;
+      docker push $IMAGE_NAME:$TRAVIS_TAG'
     on:
       tags: true
       all_branches: true

@@ -11,10 +11,11 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/intel/sriov-cni/pkg/config"
-	"github.com/intel/sriov-cni/pkg/sriov"
-	"github.com/intel/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
+
+	"github.com/DmytroLinkin/switchdev-cni/pkg/config"
+	"github.com/DmytroLinkin/switchdev-cni/pkg/sriov"
+	"github.com/DmytroLinkin/switchdev-cni/pkg/utils"
 )
 
 type envArgs struct {
@@ -83,15 +84,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 		Name:    args.IfName,
 		Sandbox: netns.Path(),
 	}}
-
-	// skip the IPAM allocation for the DPDK
-	if netConf.DPDKMode {
-		// Cache NetConf for CmdDel
-		if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
-			return fmt.Errorf("error saving NetConf %q", err)
-		}
-		return result.Print()
-	}
 
 	macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
 	defer func() {
@@ -176,33 +168,31 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	sm := sriov.NewSriovManager()
 
-	if !netConf.DPDKMode {
-		if netConf.IPAM.Type != "" {
-			err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
-			if err != nil {
-				return err
-			}
-		}
-
-		netns, err := ns.GetNS(args.Netns)
+	if netConf.IPAM.Type != "" {
+		err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
 		if err != nil {
-			// according to:
-			// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
-			// if provided path does not exist (e.x. when node was restarted)
-			// plugin should silently return with success after releasing
-			// IPAM resources
-			_, ok := err.(ns.NSPathNotExistErr)
-			if ok {
-				return nil
-			}
-
-			return fmt.Errorf("failed to open netns %s: %q", netns, err)
-		}
-		defer netns.Close()
-
-		if err = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
 			return err
 		}
+	}
+
+	netns, err := ns.GetNS(args.Netns)
+	if err != nil {
+		// according to:
+		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
+		// if provided path does not exist (e.x. when node was restarted)
+		// plugin should silently return with success after releasing
+		// IPAM resources
+		_, ok := err.(ns.NSPathNotExistErr)
+		if ok {
+			return nil
+		}
+
+		return fmt.Errorf("failed to open netns %s: %q", netns, err)
+	}
+	defer netns.Close()
+
+	if err = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
+		return err
 	}
 
 	if err := sm.ResetVFConfig(netConf); err != nil {

@@ -16,8 +16,6 @@ var (
 	NetDirectory = "/sys/class/net"
 	// SysBusPci is sysfs pci device directory
 	SysBusPci = "/sys/bus/pci/devices"
-	// UserspaceDrivers is a list of driver names that don't have netlink representation for their devices
-	UserspaceDrivers = []string{"vfio-pci", "uio_pci_generic", "igb_uio"}
 )
 
 // GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
@@ -114,35 +112,8 @@ func GetPciAddress(ifName string, vf int) (string, error) {
 	return pciaddr, nil
 }
 
-// GetSharedPF takes in VF name(ifName) as string and returns the other VF name that shares same PCI address as string
-func GetSharedPF(ifName string) (string, error) {
-	pfName := ""
-	pfDir := filepath.Join(NetDirectory, ifName)
-	dirInfo, err := os.Lstat(pfDir)
-	if err != nil {
-		return pfName, fmt.Errorf("can't get the symbolic link of the device %q: %v", ifName, err)
-	}
-
-	if (dirInfo.Mode() & os.ModeSymlink) == 0 {
-		return pfName, fmt.Errorf("No symbolic link for dir of the device %q", ifName)
-	}
-
-	fullpath, err := filepath.EvalSymlinks(pfDir)
-	parentDir := fullpath[:len(fullpath)-len(ifName)]
-	dirList, err := ioutil.ReadDir(parentDir)
-
-	for _, file := range dirList {
-		if file.Name() != ifName {
-			pfName = file.Name()
-			return pfName, nil
-		}
-	}
-
-	return pfName, fmt.Errorf("Shared PF not found")
-}
-
-// GetVFLinkNames returns VF's network interface name given it's PCI addr
-func GetVFLinkNames(pciAddr string) (string, error) {
+// GetVFLinkName returns VF's network interface name given it's PCI addr
+func GetVFLinkName(pciAddr string) (string, error) {
 	var names []string
 	vfDir := filepath.Join(SysBusPci, pciAddr, "net")
 	if _, err := os.Lstat(vfDir); err != nil {
@@ -185,26 +156,6 @@ func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
 	}
 
 	return names, nil
-}
-
-// HasDpdkDriver checks if a device is attached to dpdk supported driver
-func HasDpdkDriver(pciAddr string) (bool, error) {
-	driverLink := filepath.Join(SysBusPci, pciAddr, "driver")
-	driverPath, err := filepath.EvalSymlinks(driverLink)
-	if err != nil {
-		return false, err
-	}
-	driverStat, err := os.Stat(driverPath)
-	if err != nil {
-		return false, err
-	}
-	driverName := driverStat.Name()
-	for _, drv := range UserspaceDrivers {
-		if driverName == drv {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // SaveNetConf takes in container ID, data dir and Pod interface name as string and a json encoded struct Conf

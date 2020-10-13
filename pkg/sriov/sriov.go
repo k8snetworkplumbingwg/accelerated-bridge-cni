@@ -5,10 +5,10 @@ import (
 	"net"
 
 	"github.com/containernetworking/plugins/pkg/ns"
-
-	sriovtypes "github.com/intel/sriov-cni/pkg/types"
-	"github.com/intel/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
+
+	"github.com/DmytroLinkin/switchdev-cni/pkg/types"
+	"github.com/DmytroLinkin/switchdev-cni/pkg/utils"
 )
 
 // mocked netlink interface
@@ -33,7 +33,6 @@ type NetlinkManager interface {
 
 // MyNetlink NetlinkManager
 type MyNetlink struct {
-	lm NetlinkManager
 }
 
 // LinkByName implements NetlinkManager
@@ -123,10 +122,10 @@ func (p *pciUtilsImpl) getPciAddress(ifName string, vf int) (string, error) {
 
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
-	SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) (string, error)
-	ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error
-	ResetVFConfig(conf *sriovtypes.NetConf) error
-	ApplyVFConfig(conf *sriovtypes.NetConf) error
+	SetupVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) (string, error)
+	ReleaseVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) error
+	ResetVFConfig(conf *types.NetConf) error
+	ApplyVFConfig(conf *types.NetConf) error
 }
 
 type sriovManager struct {
@@ -143,7 +142,7 @@ func NewSriovManager() Manager {
 }
 
 // SetupVF sets up a VF in Pod netns
-func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) (string, error) {
+func (s *sriovManager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.NetNS) (string, error) {
 	linkName := conf.OrigVfState.HostIFName
 
 	linkObj, err := s.nLink.LinkByName(linkName)
@@ -208,8 +207,7 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 }
 
 // ReleaseVF reset a VF from Pod netns and return it to init netns
-func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
-
+func (s *sriovManager) ReleaseVF(conf *types.NetConf, podifName, cid string, netns ns.NetNS) error {
 	initns, err := ns.GetCurrentNS()
 	if err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
@@ -220,7 +218,6 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid
 	}
 
 	return netns.Do(func(_ ns.NetNS) error {
-
 		// get VF device
 		linkObj, err := s.nLink.LinkByName(podifName)
 		if err != nil {
@@ -270,8 +267,7 @@ func getVfInfo(link netlink.Link, id int) *netlink.VfInfo {
 }
 
 // ApplyVFConfig configure a VF with parameters given in NetConf
-func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
-
+func (s *sriovManager) ApplyVFConfig(conf *types.NetConf) error {
 	pfLink, err := s.nLink.LinkByName(conf.Master)
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
@@ -376,8 +372,7 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 }
 
 // ResetVFConfig reset a VF to its original state
-func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
-
+func (s *sriovManager) ResetVFConfig(conf *types.NetConf) error {
 	pfLink, err := s.nLink.LinkByName(conf.Master)
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
