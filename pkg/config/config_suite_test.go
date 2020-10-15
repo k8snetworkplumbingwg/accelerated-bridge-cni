@@ -3,9 +3,10 @@ package config
 import (
 	"testing"
 
-	"github.com/intel/sriov-cni/pkg/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/DmytroLinkin/switchdev-cni/pkg/utils"
 )
 
 func check(e error) {

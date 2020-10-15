@@ -1,11 +1,12 @@
 package sriov
 
 import (
-	"github.com/intel/sriov-cni/pkg/utils"
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"testing"
+	"github.com/DmytroLinkin/switchdev-cni/pkg/utils"
 )
 
 func check(e error) {
