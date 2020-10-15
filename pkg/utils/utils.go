@@ -179,7 +179,7 @@ func SaveNetConf(cid, dataDir, podIfName string, conf interface{}) error {
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
-		return fmt.Errorf("failed to create the sriov data directory(%q): %v", dataDir, err)
+		return fmt.Errorf("failed to create the plugin data directory(%q): %v", dataDir, err)
 	}
 
 	path := filepath.Join(dataDir, containerID)

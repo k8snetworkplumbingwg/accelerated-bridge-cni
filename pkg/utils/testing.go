@@ -71,7 +71,7 @@ var ts = tmpSysFs{
 
 // CreateTmpSysFs create mock sysfs for testing
 func CreateTmpSysFs() error {
-	tmpdir, err := ioutil.TempDir("/tmp", "sriov-plugin-testfiles-")
+	tmpdir, err := ioutil.TempDir("/tmp", "accelerated-bridge-testfiles-")
 	if err != nil {
 		return err
 	}

@@ -2,17 +2,17 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: kube-sriov-cni-ds-amd64
+  name: kube-accelerated-bridge-cni-ds-amd64
   namespace: kube-system
   labels:
     tier: node
-    app: sriov-cni
+    app: accelerated-bridge
 spec:
   template:
     metadata:
       labels:
         tier: node
-        app: sriov-cni
+        app: accelerated-bridge
     spec:
       hostNetwork: true
       nodeSelector:
@@ -22,8 +22,8 @@ spec:
         operator: Exists
         effect: NoSchedule
       containers:
-      - name: kube-sriov-cni
-        image: nfvpe/sriov-cni:v2.3
+      - name: kube-accelerated-bridge-cni
+        image: mellanox/accelerated-bridge-cni:v2.3
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true

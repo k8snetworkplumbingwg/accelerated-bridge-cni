@@ -1,5 +1,5 @@
 # Package related
-BINARY_NAME     = sriov
+BINARY_NAME     = accelerated-bridge
 PACKAGE         = switchdev-cni
 ORG_PATH        = github.com/DmytroLinkin
 REPO_PATH       = $(ORG_PATH)/$(PACKAGE)
@@ -24,7 +24,7 @@ LDFLAGS         = "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.d
 IMAGE_BUILDER  ?= @docker
 IMAGEDIR        = $(BASE)/images
 DOCKERFILE      = $(CURDIR)/Dockerfile
-TAG             = mellanox/sriov-cni-test
+TAG             = mellanox/accelerated-bridge-cni
 # Accept proxy settings for docker
 # To pass proxy for Docker invoke it as 'make image HTTP_POXY=http://192.168.0.1:8080'
 DOCKERARGS      =
@@ -78,9 +78,10 @@ test-xml: $(BASE) $(GO2XUNIT) ; $(info  running $(NAME:%=% )tests...) @ ## Run t
 	$(GO2XUNIT) -fail -input test/tests.output -output test/tests.xml
 
 COVERAGE_MODE = count
+COVER_PROFILE = accelerated-bridge.cover
 test-coverage-tools: | $(GOVERALLS)
 test-coverage: test-coverage-tools | $(BASE) ; $(info  running coverage tests...) @ ## Run coverage tests
-	$Q cd $(BASE); $(GO) test -covermode=$(COVERAGE_MODE) -coverprofile=sriov-cni.cover ./...
+	$Q cd $(BASE); $(GO) test -covermode=$(COVERAGE_MODE) -coverprofile=$(COVER_PROFILE) ./...
 
 # Docker image
 .PHONY: image

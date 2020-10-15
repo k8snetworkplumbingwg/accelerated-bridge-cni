@@ -5,7 +5,7 @@ set -e
 
 # Set known directories.
 CNI_BIN_DIR="/host/opt/cni/bin"
-SRIOV_BIN_FILE="/usr/bin/sriov"
+BINARY_NAME="/usr/bin/accelerated-bridge"
 
 # Give help text for parameters.
 usage()
@@ -17,7 +17,7 @@ usage()
     /bin/echo -e "./entrypoint.sh"
     /bin/echo -e "\t-h --help"
     /bin/echo -e "\t--cni-bin-dir=$CNI_BIN_DIR"
-    /bin/echo -e "\t--sriov-bin-file=$SRIOV_BIN_FILE"
+    /bin/echo -e "\t--binary=$BINARY_NAME"
 }
 
 # Parse parameters given as arguments to this script.
@@ -32,8 +32,8 @@ while [ "$1" != "" ]; do
         --cni-bin-dir)
             CNI_BIN_DIR=$VALUE
             ;;
-        --sriov-bin-file)
-            SRIOV_BIN_FILE=$VALUE
+        --binary)
+            BINARY_NAME=$VALUE
             ;;
         *)
             /bin/echo "ERROR: unknown parameter \"$PARAM\""
@@ -46,7 +46,7 @@ done
 
 
 # Loop through and verify each location each.
-for i in $CNI_BIN_DIR $SRIOV_BIN_FILE
+for i in $CNI_BIN_DIR $BINARY_NAME
 do
   if [ ! -e "$i" ]; then
     /bin/echo "Location $i does not exist"
@@ -55,7 +55,7 @@ do
 done
 
 # Copy file into proper place.
-cp -f $SRIOV_BIN_FILE $CNI_BIN_DIR
+cp -f $BINARY_NAME $CNI_BIN_DIR
 
 echo "Entering sleep... (success)"
 

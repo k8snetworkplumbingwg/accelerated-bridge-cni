@@ -1,4 +1,4 @@
-package sriov
+package manager
 
 import (
 	"testing"
@@ -16,7 +16,7 @@ func check(e error) {
 }
 func TestConfig(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Sriov Suite")
+	RunSpecs(t, "Manager Suite")
 }
 
 var _ = BeforeSuite(func() {

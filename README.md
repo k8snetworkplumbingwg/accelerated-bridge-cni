@@ -1,6 +1,6 @@
-[![Build Status](https://travis-ci.org/intel/sriov-cni.svg?branch=master)](https://travis-ci.org/intel/sriov-cni) [![Go Report Card](https://goreportcard.com/badge/github.com/intel/sriov-cni)](https://goreportcard.com/report/github.com/intel/sriov-cni)
+[![Build Status](https://travis-ci.org/mellanox/accelerated-bridge-cni.svg?branch=master)](https://travis-ci.org/mellanox/accelerated-bridge-cni) [![Go Report Card](https://goreportcard.com/badge/github.com/mellanox/accelerated-bridge-cni)](https://goreportcard.com/report/github.com/mellanox/accelerated-bridge-cni)
 
-   * [SR-IOV CNI plugin](#sr-iov-cni-plugin)
+   * [Accelerated Bridge CNI plugin](#accelerated-bridge-cni-plugin)
       * [Build](#build)
       * [Kubernetes Quick Start](#kubernetes-quick-start)
       * [Usage](#usage)
@@ -12,16 +12,16 @@
          * [Advanced configuration](#advanced-configuration)
       * [Contributing](#contributing)
 
-# SR-IOV CNI plugin
-This plugin enables the configuration and usage of SR-IOV VF networks in containers and orchestrators like Kubernetes. 
+# Accelerated Bridge CNI plugin
+This plugin enables the configuration and usage of Accelerated Bridge VF networks in containers and orchestrators like Kubernetes.
 
-Network Interface Cards (NICs) with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities are managed through physical functions (PFs) and virtual functions (VFs). A PF is used by the host and usually represents a single NIC port. VF configurations are applied through the PF. With SR-IOV CNI each VF can be treated as a separate network interface, assigned to a container, and configured with it's own MAC, VLAN IP and more.
+Network Interface Cards (NICs) with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities are managed through physical functions (PFs) and virtual functions (VFs). A PF is used by the host and usually represents a single NIC port. VF configurations are applied through the PF. With Accelerated Bridge CNI each VF can be treated as a separate network interface, assigned to a container, and configured with it's own MAC, VLAN IP and more.
 
-SR-IOV CNI plugin works with [SR-IOV device plugin](https://github.com/intel/sriov-network-device-plugin) for VF allocation in Kubernetes. A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allocated VF's `deviceID`(PCI address) and is responsible for invoking the SR-IOV CNI plugin with that `deviceID`.
+Accelerated Bridge CNI plugin works with [SR-IOV device plugin](https://github.com/intel/sriov-network-device-plugin) for VF allocation in Kubernetes. A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allocated VF's `deviceID`(PCI address) and is responsible for invoking the Accelerated Bridge CNI plugin with that `deviceID`.
 
 ## Build
 
-This plugin uses Go modules for dependency management and requires Go 1.12+ to build.
+This plugin uses Go modules for dependency management and requires Go 1.13+ to build.
 
 To build the plugin binary:
 
@@ -29,37 +29,37 @@ To build the plugin binary:
 make
 ``
 
-Upon successful build the plugin binary will be available in `build/sriov`.
+Upon successful build the plugin binary will be available in `build/accelerated-bridge`.
 
 ## Kubernetes Quick Start
-A full guide on orchestrating SR-IOV virtual functions in Kubernetes can be found at the [SR-IOV Device Plugin project.](https://github.com/intel/sriov-network-device-plugin#quick-start)
+A full guide on orchestrating Accelerated Bridge virtual functions in Kubernetes can be found at the [Accelerated Bridge Device Plugin project.](https://github.com/intel/sriov-network-device-plugin#quick-start)
 
-Creating VFs is outside the scope of the SR-IOV CNI plugin. [More information about allocating VFs on different NICs can be found here](https://github.com/intel/sriov-network-device-plugin/blob/master/docs/vf-setup.md)
+Creating VFs is outside the scope of the Accelerated Bridge CNI plugin. [More information about allocating VFs on different NICs can be found here](https://github.com/intel/sriov-network-device-plugin/blob/master/docs/vf-setup.md)
 
-To deploy SR-IOV CNI by itself on a Kubernetes 1.16+ cluster:
+To deploy Accelerated Bridge CNI by itself on a Kubernetes 1.16+ cluster:
 
-`kubectl apply -f images/k8s-v1.16/sriov-cni-daemonset.yaml`
+`kubectl apply -f images/k8s-v1.16/accelerated-bridge-cni-daemonset.yaml`
 
-**Note** The above deployment is not sufficient to manage and configure SR-IOV virtual functions. [See the full orchestration guide for more information.](https://github.com/intel/sriov-network-device-plugin#sr-iov-network-device-plugin)
+**Note** The above deployment is not sufficient to manage and configure Accelerated Bridge virtual functions. [See the full orchestration guide for more information.](https://github.com/intel/sriov-network-device-plugin#sr-iov-network-device-plugin)
 
 
 ## Usage
-SR-IOV CNI networks are commonly configured using Multus and SR-IOV Device Plugin using Network Attachment Definitions. More information about configuring Kubernetes networks using this pattern can be found in the [Multus configuration reference document.](https://intel.github.io/multus-cni/doc/configuration.html)
+Accelerated Bridge CNI networks are commonly configured using Multus and Accelerated Bridge Device Plugin using Network Attachment Definitions. More information about configuring Kubernetes networks using this pattern can be found in the [Multus configuration reference document.](https://intel.github.io/multus-cni/doc/configuration.html)
 
-A Network Attachment Definition for SR-IOV CNI takes the form:
+A Network Attachment Definition for Accelerated Bridge CNI takes the form:
 
 ```
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
-  name: sriov-net1
+  name: some-net
   annotations:
     k8s.v1.cni.cncf.io/resourceName: intel.com/intel_sriov_netdevice
 spec:
   config: '{
-  "type": "sriov",
+  "type": "accelerated-bridge",
   "cniVersion": "0.3.1",
-  "name": "sriov-network",
+  "name": "some-net",
   "ipam": {
     "type": "host-local",
     "subnet": "10.56.217.0/24",
@@ -71,28 +71,28 @@ spec:
 }'
 ```
 
-The `.spec.config` field contains the configuration information used by the SR-IOV CNI.
+The `.spec.config` field contains the configuration information used by the Accelerated Bridge CNI.
 
-### Basic configuration parameters 
+### Basic configuration parameters
 
-The following parameters are generic parameters which are not specific to the SR-IOV CNI configuration, though (with the exception of ipam) they need to be included in the config.
+The following parameters are generic parameters which are not specific to the Accelerated Bridge CNI configuration, though (with the exception of ipam) they need to be included in the config.
 
 * `cniVersion` : the version of the CNI spec used.
-* `type` : CNI plugin used. "sriov" corresponds to SR-IOV CNI.
+* `type` : CNI plugin used. "accelerated-bridge" corresponds to Accelerated Bridge CNI.
 * `name` : the name of the network created.
 * `ipam` (optional) : the configuration of the IP Address Management plugin. Required to designate an IP for a kernel interface.
 
 ### Example configurations
-The following examples show the config needed to set up basic SR-IOV networking in a container. Each of the json config objects below can be placed in the `.spec.config` field of a Network Attachment Definition to integrate with Multus.
+The following examples show the config needed to set up basic Accelerated Bridge networking in a container. Each of the json config objects below can be placed in the `.spec.config` field of a Network Attachment Definition to integrate with Multus.
 
 #### Kernel driver config
-This is the minimum configuration for a working kernel driver interface using an SR-IOV Virtual Function. It applies an IP address using the host-local IPAM plugin in the range of the subnet provided. 
+This is the minimum configuration for a working kernel driver interface using an Accelerated Bridge Virtual Function. It applies an IP address using the host-local IPAM plugin in the range of the subnet provided.
 
 ```json
 {
-  "type": "sriov",
+  "type": "accelerated-bridge",
   "cniVersion": "0.3.1",
-  "name": "sriov-network",
+  "name": "some-net",
   "ipam": {
     "type": "host-local",
     "subnet": "10.56.217.0/24",
@@ -105,13 +105,13 @@ This is the minimum configuration for a working kernel driver interface using an
 ```
 
 #### Extended kernel driver config
-This configuration sets a number of extra parameters that may be key for SR-IOV networks including a vlan tag, disabled spoof checking and enabled trust mode. These parameters are commonly set in more advanced SR-IOV VF based networks.
+This configuration sets a number of extra parameters that may be key for Accelerated Bridge networks including a vlan tag, disabled spoof checking and enabled trust mode. These parameters are commonly set in more advanced Accelerated Bridge VF based networks.
 
 ```json
 {
   "cniVersion": "0.3.1",
-  "name": "sriov-advanced",
-  "type": "sriov",
+  "name": "some-net-advanced",
+  "type": "accelerated-bridge",
   "vlan": 1000,
   "spoofchk": "off",
   "trust": "on",
@@ -128,20 +128,20 @@ This configuration sets a number of extra parameters that may be key for SR-IOV 
 
 #### DPDK userspace driver config
 
-The below config will configure a VF using a userspace driver (uio/vfio) for use in a container. If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored. Other config parameters should be applicable but implementation may be driver specific. 
+The below config will configure a VF using a userspace driver (uio/vfio) for use in a container. If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored. Other config parameters should be applicable but implementation may be driver specific.
 
 ```json
 {
     "cniVersion": "0.3.1",
-    "name": "sriov-dpdk",
-    "type": "sriov",
+    "name": "some-net-dpdk",
+    "type": "accelerated-bridge",
     "vlan": 1000
 }
 ```
 
-### Advanced Configuration 
+### Advanced Configuration
 
-SR-IOV CNI allows the setting of other SR-IOV options such as link-state and quality of service parameters. To learn more about how these parameters are set consult the [SR-IOV CNI configuration reference guide](docs/configuration-reference.md)  
+Accelerated Bridge CNI allows the setting of SR-IOV options such a link-state and quality of service parameters. To learn more about how these parameters are set consult the [Accelerated Bridge CNI configuration reference guide](docs/configuration-reference.md)
 
 ## Contributing
 To report a bug or request a feature, open an issue on this repo using one of the available templates.

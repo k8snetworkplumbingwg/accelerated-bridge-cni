@@ -1,4 +1,4 @@
-package sriov
+package manager
 
 import (
 	"net"
@@ -312,8 +312,8 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetUp", fakeLink).Return(nil)
 			mocked.On("LinkSetVfVlan", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetVfVlanQos", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
-			sm := sriovManager{nLink: mocked}
-			macAddr, err := sm.SetupVF(netconf, podifName, contID, targetNetNS)
+			m := manager{nLink: mocked}
+			macAddr, err := m.SetupVF(netconf, podifName, contID, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(macAddr).To(Equal("6e:16:06:0e:b7:e9"))
 		})
@@ -348,8 +348,8 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
-			sm := sriovManager{nLink: mocked}
-			err := sm.ReleaseVF(netconf, podifName, contID, targetNetNS)
+			m := manager{nLink: mocked}
+			err := m.ReleaseVF(netconf, podifName, contID, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
@@ -388,8 +388,8 @@ var _ = Describe("Sriov", func() {
 			origEffMac, err := net.ParseMAC(netconf.OrigVfState.EffectiveMAC)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.On("LinkSetHardwareAddr", fakeLink, origEffMac).Return(nil)
-			sm := sriovManager{nLink: mocked}
-			err = sm.ReleaseVF(netconf, podifName, contID, targetNetNS)
+			m := manager{nLink: mocked}
+			err = m.ReleaseVF(netconf, podifName, contID, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
@@ -415,8 +415,8 @@ var _ = Describe("Sriov", func() {
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
-			sm := sriovManager{nLink: mocked}
-			err := sm.ResetVFConfig(netconf)
+			m := manager{nLink: mocked}
+			err := m.ResetVFConfig(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
@@ -473,8 +473,8 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetVfRate", fakeLink, netconf.VFID, netconf.OrigVfState.MinTxRate, netconf.OrigVfState.MaxTxRate).Return(nil)
 			mocked.On("LinkSetVfState", fakeLink, netconf.VFID, netconf.OrigVfState.LinkState).Return(nil)
 
-			sm := sriovManager{nLink: mocked}
-			err = sm.ResetVFConfig(netconf)
+			m := manager{nLink: mocked}
+			err = m.ResetVFConfig(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})

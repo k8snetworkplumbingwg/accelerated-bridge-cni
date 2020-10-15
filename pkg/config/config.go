@@ -14,7 +14,7 @@ import (
 
 var (
 	// DefaultCNIDir used for caching NetConf
-	DefaultCNIDir = "/var/lib/cni/sriov"
+	DefaultCNIDir = "/var/lib/cni/accelerated-bridge"
 )
 
 // LoadConf parses and validates stdin netconf and returns NetConf object
