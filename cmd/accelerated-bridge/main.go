@@ -13,9 +13,9 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 
-	"github.com/DmytroLinkin/switchdev-cni/pkg/config"
-	"github.com/DmytroLinkin/switchdev-cni/pkg/manager"
-	"github.com/DmytroLinkin/switchdev-cni/pkg/utils"
+	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/config"
+	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/manager"
+	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/utils"
 )
 
 type envArgs struct {

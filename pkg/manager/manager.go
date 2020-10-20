@@ -7,8 +7,8 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 
-	"github.com/DmytroLinkin/switchdev-cni/pkg/types"
-	"github.com/DmytroLinkin/switchdev-cni/pkg/utils"
+	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/types"
+	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/utils"
 )
 
 // mocked netlink interface

@@ -1,6 +1,6 @@
 # Package related
 BINARY_NAME     = accelerated-bridge
-PACKAGE         = switchdev-cni
+PACKAGE         = accelerated-bridge-cni
 ORG_PATH        = github.com/DmytroLinkin
 REPO_PATH       = $(ORG_PATH)/$(PACKAGE)
 GOPATH          = $(CURDIR)/.gopath
