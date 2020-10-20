@@ -1,4 +1,4 @@
-module github.com/DmytroLinkin/switchdev-cni
+module github.com/DmytroLinkin/accelerated-bridge-cni
 
 go 1.13
 
