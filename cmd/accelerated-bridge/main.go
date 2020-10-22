@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -11,6 +12,8 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
 
 	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/config"
@@ -45,13 +48,24 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 func cmdAdd(args *skel.CmdArgs) error {
 	var macAddr string
 	netConf, err := config.LoadConf(args.StdinData)
+	defer func() {
+		if err == nil {
+			log.Debug().Msg("CmdAdd done.")
+		} else {
+			log.Error().Msgf("CmdAdd failed - %v.", err)
+		}
+	}()
 	if err != nil {
-		return fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
+		return fmt.Errorf("failed to load netconf: %v", err)
+	}
+
+	if netConf.Debug == true {
+		setDebugMode()
 	}
 
 	envArgs, err := getEnvArgs(args.Args)
 	if err != nil {
-		return fmt.Errorf("SRIOV-CNI failed to parse args: %v", err)
+		return fmt.Errorf("failed to parse args: %v", err)
 	}
 
 	if envArgs != nil {
@@ -75,8 +89,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 	defer netns.Close()
 
 	m := manager.NewManager()
+	if err = m.AttachRepresentor(netConf); err != nil {
+		return fmt.Errorf("failed to attach representor: %v", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = m.DetachRepresentor(netConf)
+		}
+	}()
+
 	if err := m.ApplyVFConfig(netConf); err != nil {
-		return fmt.Errorf("SRIOV-CNI failed to configure VF %q", err)
+		return fmt.Errorf("failed to configure VF %q", err)
 	}
 
 	result := &current.Result{}
@@ -152,12 +175,24 @@ func cmdAdd(args *skel.CmdArgs) error {
 func cmdDel(args *skel.CmdArgs) error {
 	// https://github.com/kubernetes/kubernetes/pull/35240
 	if args.Netns == "" {
+		log.Warn().Msgf("CmdDel skipping - netns is not provided.")
 		return nil
 	}
 
 	netConf, cRefPath, err := config.LoadConfFromCache(args)
+	defer func() {
+		if err == nil {
+			log.Debug().Msg("CmdDel done.")
+		} else {
+			log.Error().Msgf("CmdDel failed - %v.", err)
+		}
+	}()
 	if err != nil {
 		return err
+	}
+
+	if netConf.Debug == true {
+		setDebugMode()
 	}
 
 	defer func() {
@@ -167,6 +202,10 @@ func cmdDel(args *skel.CmdArgs) error {
 	}()
 
 	m := manager.NewManager()
+
+	if err = m.DetachRepresentor(netConf); err != nil {
+		log.Warn().Msgf("failed to detach representor: %v", err)
+	}
 
 	if netConf.IPAM.Type != "" {
 		err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
@@ -206,6 +245,20 @@ func cmdCheck(args *skel.CmdArgs) error {
 	return nil
 }
 
+func setupLogger() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: zerolog.TimeFieldFormat,
+		NoColor:    true,
+	})
+}
+
+func setDebugMode() {
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+}
+
 func main() {
+	setupLogger()
 	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "")
 }

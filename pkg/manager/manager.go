@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/Mellanox/sriovnet"
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
 
 	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/types"
@@ -14,7 +16,7 @@ import (
 // mocked netlink interface
 // required for unit tests
 
-// NetlinkManager is an interface to mock nelink library
+// NetlinkManager is an interface to mock netlink library
 type NetlinkManager interface {
 	LinkByName(string) (netlink.Link, error)
 	LinkSetVfVlan(netlink.Link, int, int) error
@@ -29,6 +31,8 @@ type NetlinkManager interface {
 	LinkSetVfSpoofchk(netlink.Link, int, bool) error
 	LinkSetVfTrust(netlink.Link, int, bool) error
 	LinkSetVfState(netlink.Link, int, uint32) error
+	LinkSetMaster(netlink.Link, netlink.Link) error
+	LinkSetNoMaster(netlink.Link) error
 }
 
 // MyNetlink NetlinkManager
@@ -100,6 +104,16 @@ func (n *MyNetlink) LinkSetVfState(link netlink.Link, vf int, state uint32) erro
 	return netlink.LinkSetVfState(link, vf, state)
 }
 
+// LinkSetMaster using NetlinkManager
+func (n *MyNetlink) LinkSetMaster(link, master netlink.Link) error {
+	return netlink.LinkSetMaster(link, master)
+}
+
+// LinkSetNoMaster using NetlinkManager
+func (n *MyNetlink) LinkSetNoMaster(link netlink.Link) error {
+	return netlink.LinkSetNoMaster(link)
+}
+
 type pciUtils interface {
 	getSriovNumVfs(ifName string) (int, error)
 	getVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error)
@@ -120,24 +134,41 @@ func (p *pciUtilsImpl) getPciAddress(ifName string, vf int) (string, error) {
 	return utils.GetPciAddress(ifName, vf)
 }
 
+// mocked sriovnet interface
+// required for unit tests
+
+type Sriovnet interface {
+	GetVfRepresentor(string, int) (string, error)
+}
+
+type MyLittleSriov struct{}
+
+func (s *MyLittleSriov) GetVfRepresentor(master string, vfid int) (string, error) {
+	return sriovnet.GetVfRepresentor(master, vfid)
+}
+
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
 	SetupVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) (string, error)
 	ReleaseVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) error
 	ResetVFConfig(conf *types.NetConf) error
 	ApplyVFConfig(conf *types.NetConf) error
+	AttachRepresentor(conf *types.NetConf) error
+	DetachRepresentor(conf *types.NetConf) error
 }
 
 type manager struct {
 	nLink NetlinkManager
 	utils pciUtils
+	sriov Sriovnet
 }
 
-// NewManager returns an instance of SriovManager
+// NewManager returns an instance of manager
 func NewManager() Manager {
 	return &manager{
 		nLink: &MyNetlink{},
 		utils: &pciUtilsImpl{},
+		sriov: &MyLittleSriov{},
 	}
 }
 
@@ -433,4 +464,42 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 	}
 
 	return nil
+}
+
+func (m *manager) AttachRepresentor(conf *types.NetConf) error {
+	bridge, err := m.nLink.LinkByName(conf.Bridge)
+	if err != nil {
+		return fmt.Errorf("failed to get bridge link %s: %v", conf.Bridge, err)
+	}
+
+	conf.Representor, err = m.sriov.GetVfRepresentor(conf.Master, conf.VFID)
+	if err != nil {
+		return fmt.Errorf("failed to get VF's %d representor on NIC %s: %v", conf.VFID, conf.Master, err)
+	}
+
+	var rep netlink.Link
+	if rep, err = m.nLink.LinkByName(conf.Representor); err != nil {
+		return fmt.Errorf("failed to get representor link %s: %v", conf.Representor, err)
+	}
+
+	if err = m.nLink.LinkSetUp(rep); err != nil {
+		return fmt.Errorf("failed to set representor %s up: %v", conf.Representor, err)
+	}
+
+	log.Info().Msgf("Attaching rep %s to the bridge %s", conf.Representor, conf.Bridge)
+	return m.nLink.LinkSetMaster(rep, bridge)
+}
+
+func (m *manager) DetachRepresentor(conf *types.NetConf) error {
+	rep, err := m.nLink.LinkByName(conf.Representor)
+	if err != nil {
+		return fmt.Errorf("failed to get representor %s link: %v", conf.Representor, err)
+	}
+
+	if err = m.nLink.LinkSetDown(rep); err != nil {
+		return fmt.Errorf("failed to set representor %s down: %v", conf.Representor, err)
+	}
+
+	log.Info().Msgf("Detaching rep %s from the bridge %s", conf.Representor, conf.Bridge)
+	return m.nLink.LinkSetNoMaster(rep)
 }

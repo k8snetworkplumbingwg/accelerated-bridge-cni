@@ -12,14 +12,18 @@ import (
 	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/utils"
 )
 
-var (
+const (
 	// DefaultCNIDir used for caching NetConf
 	DefaultCNIDir = "/var/lib/cni/accelerated-bridge"
+	DefaultBridge = "cni0"
 )
 
 // LoadConf parses and validates stdin netconf and returns NetConf object
 func LoadConf(bytes []byte) (*localtypes.NetConf, error) {
-	n := &localtypes.NetConf{}
+	n := &localtypes.NetConf{
+		Debug:  false,
+		Bridge: DefaultBridge,
+	}
 	if err := json.Unmarshal(bytes, n); err != nil {
 		return nil, fmt.Errorf("LoadConf(): failed to load netconf: %v", err)
 	}
