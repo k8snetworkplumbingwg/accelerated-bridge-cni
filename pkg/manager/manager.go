@@ -13,6 +13,10 @@ import (
 	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/utils"
 )
 
+const (
+	ON = "on"
+)
+
 // mocked netlink interface
 // required for unit tests
 
@@ -85,7 +89,7 @@ func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
 }
 
 // LinkSetVfRate using NetlinkManager
-func (n *MyNetlink) LinkSetVfRate(link netlink.Link, vf int, minRate int, maxRate int) error {
+func (n *MyNetlink) LinkSetVfRate(link netlink.Link, vf, minRate, maxRate int) error {
 	return netlink.LinkSetVfRate(link, vf, minRate, maxRate)
 }
 
@@ -245,7 +249,8 @@ func (m *manager) ReleaseVF(conf *types.NetConf, podifName, cid string, netns ns
 	}
 
 	if len(conf.ContIFNames) < 1 && len(conf.ContIFNames) != len(conf.OrigVfState.HostIFName) {
-		return fmt.Errorf("number of interface names mismatch ContIFNames: %d HostIFNames: %d", len(conf.ContIFNames), len(conf.OrigVfState.HostIFName))
+		return fmt.Errorf("number of interface names mismatch ContIFNames: %d HostIFNames: %d",
+			len(conf.ContIFNames), len(conf.OrigVfState.HostIFName))
 	}
 
 	return netns.Do(func(_ ns.NetNS) error {
@@ -263,24 +268,29 @@ func (m *manager) ReleaseVF(conf *types.NetConf, podifName, cid string, netns ns
 		// rename VF device
 		err = m.nLink.LinkSetName(linkObj, conf.OrigVfState.HostIFName)
 		if err != nil {
-			return fmt.Errorf("failed to rename link %s to host name %s: %q", podifName, conf.OrigVfState.HostIFName, err)
+			return fmt.Errorf("failed to rename link %s to host name %s: %q",
+				podifName, conf.OrigVfState.HostIFName, err)
 		}
 
 		// reset effective MAC address
 		if conf.MAC != "" {
-			hwaddr, err := net.ParseMAC(conf.OrigVfState.EffectiveMAC)
+			var hwaddr net.HardwareAddr
+			hwaddr, err = net.ParseMAC(conf.OrigVfState.EffectiveMAC)
 			if err != nil {
-				return fmt.Errorf("failed to parse original effective MAC address %s: %v", conf.OrigVfState.EffectiveMAC, err)
+				return fmt.Errorf("failed to parse original effective MAC address %s: %v",
+					conf.OrigVfState.EffectiveMAC, err)
 			}
 
 			if err = m.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
-				return fmt.Errorf("failed to restore original effective netlink MAC address %s: %v", hwaddr, err)
+				return fmt.Errorf("failed to restore original effective netlink MAC address %s: %v",
+					hwaddr, err)
 			}
 		}
 
 		// move VF device to init netns
 		if err = m.nLink.LinkSetNsFd(linkObj, int(initns.Fd())); err != nil {
-			return fmt.Errorf("failed to move interface %s to init netns: %v", conf.OrigVfState.HostIFName, err)
+			return fmt.Errorf("failed to move interface %s to init netns: %v",
+				conf.OrigVfState.HostIFName, err)
 		}
 
 		return nil
@@ -328,7 +338,8 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 
 	// 2. Set mac address
 	if conf.MAC != "" {
-		hwaddr, err := net.ParseMAC(conf.MAC)
+		var hwaddr net.HardwareAddr
+		hwaddr, err = net.ParseMAC(conf.MAC)
 		if err != nil {
 			return fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
 		}
@@ -361,7 +372,7 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 	// 4. Set spoofchk flag
 	if conf.SpoofChk != "" {
 		spoofChk := false
-		if conf.SpoofChk == "on" {
+		if conf.SpoofChk == ON {
 			spoofChk = true
 		}
 		if err = m.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, spoofChk); err != nil {
@@ -372,7 +383,7 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 	// 5. Set trust flag
 	if conf.Trust != "" {
 		trust := false
-		if conf.Trust == "on" {
+		if conf.Trust == ON {
 			trust = true
 		}
 		if err = m.nLink.LinkSetVfTrust(pfLink, conf.VFID, trust); err != nil {
@@ -429,9 +440,11 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 
 	// Restore the original administrative MAC address
 	if conf.MAC != "" {
-		hwaddr, err := net.ParseMAC(conf.OrigVfState.AdminMAC)
+		var hwaddr net.HardwareAddr
+		hwaddr, err = net.ParseMAC(conf.OrigVfState.AdminMAC)
 		if err != nil {
-			return fmt.Errorf("failed to parse original administrative MAC address %s: %v", conf.OrigVfState.AdminMAC, err)
+			return fmt.Errorf("failed to parse original administrative MAC address %s: %v",
+				conf.OrigVfState.AdminMAC, err)
 		}
 		if err = m.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
 			return fmt.Errorf("failed to restore original administrative MAC address %s: %v", hwaddr, err)
@@ -449,7 +462,8 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 
 	// Restore rate limiting
 	if conf.MinTxRate != nil || conf.MaxTxRate != nil {
-		if err = m.nLink.LinkSetVfRate(pfLink, conf.VFID, conf.OrigVfState.MinTxRate, conf.OrigVfState.MaxTxRate); err != nil {
+		err = m.nLink.LinkSetVfRate(pfLink, conf.VFID, conf.OrigVfState.MinTxRate, conf.OrigVfState.MaxTxRate)
+		if err != nil {
 			return fmt.Errorf("failed to disable rate limiting for vf %d %v", conf.VFID, err)
 		}
 	}

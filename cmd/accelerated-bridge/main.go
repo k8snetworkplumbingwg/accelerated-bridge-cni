@@ -26,6 +26,7 @@ type envArgs struct {
 	MAC types.UnmarshallableString `json:"mac,omitempty"`
 }
 
+//nolint:gochecknoinits
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
 	// since namespace ops (unshare, setns) are done for a single thread, we
@@ -46,7 +47,6 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
-	var macAddr string
 	netConf, err := config.LoadConf(args.StdinData)
 	defer func() {
 		if err == nil {
@@ -59,7 +59,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("failed to load netconf: %v", err)
 	}
 
-	if netConf.Debug == true {
+	if netConf.Debug {
 		setDebugMode()
 	}
 
@@ -98,7 +98,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}()
 
-	if err := m.ApplyVFConfig(netConf); err != nil {
+	if err = m.ApplyVFConfig(netConf); err != nil {
 		return fmt.Errorf("failed to configure VF %q", err)
 	}
 
@@ -108,38 +108,41 @@ func cmdAdd(args *skel.CmdArgs) error {
 		Sandbox: netns.Path(),
 	}}
 
+	var macAddr string
 	macAddr, err = m.SetupVF(netConf, args.IfName, args.ContainerID, netns)
 	defer func() {
 		if err != nil {
-			err := netns.Do(func(_ ns.NetNS) error {
-				_, err := netlink.LinkByName(args.IfName)
+			err = netns.Do(func(_ ns.NetNS) error {
+				_, err = netlink.LinkByName(args.IfName)
 				return err
 			})
 			if err == nil {
-				m.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+				_ = m.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
 			}
 		}
 	}()
 	if err != nil {
-		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
+		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v",
+			args.IfName, netConf.Master, err)
 	}
 
 	// run the IPAM plugin
 	if netConf.IPAM.Type != "" {
-		r, err := ipam.ExecAdd(netConf.IPAM.Type, args.StdinData)
-		if err != nil {
-			return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v", netConf.IPAM.Type, netConf.Master, err)
+		var r types.Result
+		if r, err = ipam.ExecAdd(netConf.IPAM.Type, args.StdinData); err != nil {
+			return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v",
+				netConf.IPAM.Type, netConf.Master, err)
 		}
 
 		defer func() {
 			if err != nil {
-				ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
+				_ = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
 			}
 		}()
 
 		// Convert the IPAM result into the current Result type
-		newResult, err := current.NewResultFromResult(r)
-		if err != nil {
+		var newResult *current.Result
+		if newResult, err = current.NewResultFromResult(r); err != nil {
 			return err
 		}
 
@@ -191,13 +194,13 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	if netConf.Debug == true {
+	if netConf.Debug {
 		setDebugMode()
 	}
 
 	defer func() {
 		if err == nil && cRefPath != "" {
-			utils.CleanCachedNetConf(cRefPath)
+			_ = utils.CleanCachedNetConf(cRefPath)
 		}
 	}()
 
@@ -230,7 +233,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if err = m.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
+	if err := m.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
 		return err
 	}
 

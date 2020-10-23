@@ -25,7 +25,7 @@ func LoadConf(bytes []byte) (*localtypes.NetConf, error) {
 		Bridge: DefaultBridge,
 	}
 	if err := json.Unmarshal(bytes, n); err != nil {
-		return nil, fmt.Errorf("LoadConf(): failed to load netconf: %v", err)
+		return nil, fmt.Errorf("failed to load netconf: %v", err)
 	}
 
 	// DeviceID takes precedence; if we are given a VF pciaddr then work from there
@@ -33,12 +33,12 @@ func LoadConf(bytes []byte) (*localtypes.NetConf, error) {
 		// Get rest of the VF information
 		pfName, vfID, err := getVfInfo(n.DeviceID)
 		if err != nil {
-			return nil, fmt.Errorf("LoadConf(): failed to get VF information: %q", err)
+			return nil, fmt.Errorf("failed to get VF information: %q", err)
 		}
 		n.VFID = vfID
 		n.Master = pfName
 	} else {
-		return nil, fmt.Errorf("LoadConf(): VF pci addr is required")
+		return nil, fmt.Errorf("VF pci addr is required")
 	}
 
 	// Assuming VF is netdev interface; Get interface name
@@ -55,28 +55,28 @@ func LoadConf(bytes []byte) (*localtypes.NetConf, error) {
 	if n.Vlan != nil {
 		// validate vlan id range
 		if *n.Vlan < 0 || *n.Vlan > 4094 {
-			return nil, fmt.Errorf("LoadConf(): vlan id %d invalid: value must be in the range 0-4094", *n.Vlan)
+			return nil, fmt.Errorf("vlan id %d invalid: value must be in the range 0-4094", *n.Vlan)
 		}
 	}
 
 	if n.VlanQoS != nil {
 		// validate that VLAN QoS is in the 0-7 range
 		if *n.VlanQoS < 0 || *n.VlanQoS > 7 {
-			return nil, fmt.Errorf("LoadConf(): vlan QoS PCP %d invalid: value must be in the range 0-7", *n.VlanQoS)
+			return nil, fmt.Errorf("vlan QoS PCP %d invalid: value must be in the range 0-7", *n.VlanQoS)
 		}
 		// validate that vlan id is set
 		if n.Vlan == nil {
-			return nil, fmt.Errorf("LoadConf(): vlan id must be configured to set vlan QoS")
+			return nil, fmt.Errorf("vlan id must be configured to set vlan QoS")
 		}
 		// validate non-zero value for vlan id if vlan qos is set to a non-zero value
 		if *n.VlanQoS != 0 && *n.Vlan == 0 {
-			return nil, fmt.Errorf("LoadConf(): non-zero vlan id must be configured to set vlan QoS to a non-zero value")
+			return nil, fmt.Errorf("non-zero vlan id must be configured to set vlan QoS to a non-zero value")
 		}
 	}
 
 	// validate that link state is one of supported values
 	if n.LinkState != "" && n.LinkState != "auto" && n.LinkState != "enable" && n.LinkState != "disable" {
-		return nil, fmt.Errorf("LoadConf(): invalid link_state value: %s", n.LinkState)
+		return nil, fmt.Errorf("invalid link_state value: %s", n.LinkState)
 	}
 
 	return n, nil
