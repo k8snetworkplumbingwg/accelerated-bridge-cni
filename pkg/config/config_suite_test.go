@@ -26,7 +26,6 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	var err error
-	err = utils.RemoveTmpSysFs()
+	err := utils.RemoveTmpSysFs()
 	check(err)
 })

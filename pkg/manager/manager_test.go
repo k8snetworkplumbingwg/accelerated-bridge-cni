@@ -265,13 +265,15 @@ var _ = Describe("Manager", func() {
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
-			mocked.On("LinkSetVfVlanQos", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan, netconf.OrigVfState.VlanQoS).Return(nil)
+			mocked.On("LinkSetVfVlanQos", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan,
+				netconf.OrigVfState.VlanQoS).Return(nil)
 			mocked.On("LinkSetVfSpoofchk", fakeLink, netconf.VFID, netconf.OrigVfState.SpoofChk).Return(nil)
 			origMac, err := net.ParseMAC(netconf.OrigVfState.AdminMAC)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, origMac).Return(nil)
 			mocked.On("LinkSetVfTrust", fakeLink, netconf.VFID, false).Return(nil)
-			mocked.On("LinkSetVfRate", fakeLink, netconf.VFID, netconf.OrigVfState.MinTxRate, netconf.OrigVfState.MaxTxRate).Return(nil)
+			mocked.On("LinkSetVfRate", fakeLink, netconf.VFID, netconf.OrigVfState.MinTxRate,
+				netconf.OrigVfState.MaxTxRate).Return(nil)
 			mocked.On("LinkSetVfState", fakeLink, netconf.VFID, netconf.OrigVfState.LinkState).Return(nil)
 
 			m := manager{nLink: mocked}
