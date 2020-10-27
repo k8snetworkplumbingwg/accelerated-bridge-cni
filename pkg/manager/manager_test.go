@@ -118,6 +118,33 @@ var _ = Describe("Manager", func() {
 			Expect(macAddr).To(Equal("6e:16:06:0e:b7:e9"))
 			mocked.AssertExpectations(t)
 		})
+		It("Setting mac address", func() {
+			targetNetNS := newFakeNs()
+			mocked := &mocks.NetlinkManager{}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).NotTo(HaveOccurred())
+			netconf.MAC = "e4:11:22:33:44:55"
+			expMac, err := net.ParseMAC(netconf.MAC)
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &FakeLink{netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "dummylink",
+				HardwareAddr: fakeMac,
+			}}
+
+			mocked.On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
+			mocked.On("LinkSetHardwareAddr", fakeLink, expMac).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", fakeLink).Return(nil)
+			m := manager{nLink: mocked}
+			macAddr, err := m.SetupVF(netconf, podifName, contID, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(macAddr).To(Equal(netconf.MAC))
+			mocked.AssertExpectations(t)
+		})
 	})
 
 	Context("Checking ReleaseVF function", func() {

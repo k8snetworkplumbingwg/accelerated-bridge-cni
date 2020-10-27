@@ -198,9 +198,11 @@ func (m *manager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.N
 		return "", fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
 	}
 
+	macAddress := linkObj.Attrs().HardwareAddr.String()
 	// 3. Set MAC address
 	if conf.MAC != "" {
 		hwaddr, err := net.ParseMAC(conf.MAC)
+		macAddress = conf.MAC
 		if err != nil {
 			return "", fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
 		}
@@ -218,8 +220,6 @@ func (m *manager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.N
 		return "", fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
 	}
 
-	var macAddress string
-
 	if err := netns.Do(func(_ ns.NetNS) error {
 		// 5. Set Pod IF name
 		if err := m.nLink.LinkSetName(linkObj, podifName); err != nil {
@@ -231,7 +231,6 @@ func (m *manager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.N
 			return fmt.Errorf("error bringing interface up in container ns: %q", err)
 		}
 
-		macAddress = linkObj.Attrs().HardwareAddr.String()
 		return nil
 	}); err != nil {
 		return "", fmt.Errorf("error setting up interface in container namespace: %q", err)
