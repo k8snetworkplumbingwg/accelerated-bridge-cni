@@ -1,6 +1,6 @@
 ---
 name: Enhancement / Feature Request
-about: Suggest an enhancement or new feature for SR-IOV CNI
+about: Suggest an enhancement or new feature for Accelerated Bridge CNI
 
 ---
 <!--  Please use this template to submit feature and enhancement requests -->

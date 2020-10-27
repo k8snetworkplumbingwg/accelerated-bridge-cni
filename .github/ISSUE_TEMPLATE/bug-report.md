@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug with SR-IOV CNI
+about: Report a bug with Accelerated Bridge CNI
 
 ---
 <!-- Please use this template while reporting a bug and provide as much relevant info as possible. Doing so give us the best chance to find a prompt resolution to your issue -->
@@ -17,12 +17,12 @@ about: Report a bug with SR-IOV CNI
 Please fill in the below table with the version numbers of applicable components used.
 
 Component | Version|
-------------------------------|--------------------|
-|SR-IOV CNI Plugin            |<Input Version Here>|
-|Multus                       |<Input Version Here>|
-|SR-IOV Network Device Plugin |<Input Version Here>|
-|Kubernetes                   |<Input Version Here>| 
-|OS                           |<Input Version Here>|
+-------------------------------|--------------------|
+|Accelerated Bridge CNI Plugin |<Input Version Here>|
+|Multus                        |<Input Version Here>|
+|SR-IOV Network Device Plugin  |<Input Version Here>|
+|Kubernetes                    |<Input Version Here>|
+|OS                            |<Input Version Here>|
 
 ### Config Files
 Config file locations may be config dependent.
@@ -33,7 +33,7 @@ Config file locations may be config dependent.
 
 ##### Multus config (Try '/etc/cni/multus/net.d')
 
-##### Kubernetes deployment type ( Bare Metal, Kubeadm etc.)
+##### Kubernetes deployment type (Bare Metal, Kubeadm etc.)
 
 ##### Kubeconfig file
 
