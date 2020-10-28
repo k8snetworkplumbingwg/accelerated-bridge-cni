@@ -200,11 +200,11 @@ func (m *manager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.N
 
 	macAddress := linkObj.Attrs().HardwareAddr.String()
 	// 3. Set MAC address
-	if conf.MAC != "" {
-		hwaddr, err := net.ParseMAC(conf.MAC)
-		macAddress = conf.MAC
+	if conf.RuntimeConfig.Mac != "" {
+		hwaddr, err := net.ParseMAC(conf.RuntimeConfig.Mac)
+		macAddress = conf.RuntimeConfig.Mac
 		if err != nil {
-			return "", fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
+			return "", fmt.Errorf("failed to parse MAC address %s: %v", conf.RuntimeConfig.Mac, err)
 		}
 
 		// Save the original effective MAC address before overriding it
@@ -272,7 +272,7 @@ func (m *manager) ReleaseVF(conf *types.NetConf, podifName, cid string, netns ns
 		}
 
 		// reset effective MAC address
-		if conf.MAC != "" {
+		if conf.OrigVfState.EffectiveMAC != "" {
 			var hwaddr net.HardwareAddr
 			hwaddr, err = net.ParseMAC(conf.OrigVfState.EffectiveMAC)
 			if err != nil {
@@ -320,27 +320,19 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 	}
 	conf.OrigVfState.FillFromVfInfo(vfState)
 
-	// 1. Set vlan
+	// 1. Set vlan; XXX: There was no decision to do vlan tagging as usual or with tc command. Keeped as is
 	if conf.Vlan != nil {
-		// set vlan qos if present in the config
-		if conf.VlanQoS != nil {
-			if err = m.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS); err != nil {
-				return fmt.Errorf("failed to set vf %d vlan configuration: %v", conf.VFID, err)
-			}
-		} else {
-			// set vlan id field only
-			if err = m.nLink.LinkSetVfVlan(pfLink, conf.VFID, *conf.Vlan); err != nil {
-				return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
-			}
+		if err = m.nLink.LinkSetVfVlan(pfLink, conf.VFID, *conf.Vlan); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
 		}
 	}
 
 	// 2. Set mac address
-	if conf.MAC != "" {
+	if conf.RuntimeConfig.Mac != "" {
 		var hwaddr net.HardwareAddr
-		hwaddr, err = net.ParseMAC(conf.MAC)
+		hwaddr, err = net.ParseMAC(conf.RuntimeConfig.Mac)
 		if err != nil {
-			return fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
+			return fmt.Errorf("failed to parse MAC address %s: %v", conf.RuntimeConfig.Mac, err)
 		}
 
 		if err = m.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
@@ -348,38 +340,7 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 		}
 	}
 
-	// 3. Set min/max tx link rate. 0 means no rate limiting. Support depends on NICs and driver.
-	var minTxRate, maxTxRate int
-	rateConfigured := false
-	if conf.MinTxRate != nil {
-		minTxRate = *conf.MinTxRate
-		rateConfigured = true
-	}
-
-	if conf.MaxTxRate != nil {
-		maxTxRate = *conf.MaxTxRate
-		rateConfigured = true
-	}
-
-	if rateConfigured {
-		if err = m.nLink.LinkSetVfRate(pfLink, conf.VFID, minTxRate, maxTxRate); err != nil {
-			return fmt.Errorf("failed to set vf %d min_tx_rate to %d Mbps: max_tx_rate to %d Mbps: %v",
-				conf.VFID, minTxRate, maxTxRate, err)
-		}
-	}
-
-	// 4. Set spoofchk flag
-	if conf.SpoofChk != "" {
-		spoofChk := false
-		if conf.SpoofChk == ON {
-			spoofChk = true
-		}
-		if err = m.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, spoofChk); err != nil {
-			return fmt.Errorf("failed to set vf %d spoofchk flag to %s: %v", conf.VFID, conf.SpoofChk, err)
-		}
-	}
-
-	// 5. Set trust flag
+	// 3. Set trust flag
 	if conf.Trust != "" {
 		trust := false
 		if conf.Trust == ON {
@@ -390,7 +351,7 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 		}
 	}
 
-	// 6. Set link state
+	// 4. Set link state
 	if conf.LinkState != "" {
 		var state uint32
 		switch conf.LinkState {
@@ -419,26 +380,15 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
-	// Restore VLAN
+	// Restore VLAN; XXX: There was no decision to do vlan tagging as usual or with tc command. Keeped as is
 	if conf.Vlan != nil {
-		if conf.VlanQoS != nil {
-			if err = m.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS); err != nil {
-				return fmt.Errorf("failed to restore vf %d vlan: %v", conf.VFID, err)
-			}
-		} else if err = m.nLink.LinkSetVfVlan(pfLink, conf.VFID, conf.OrigVfState.Vlan); err != nil {
+		if err = m.nLink.LinkSetVfVlan(pfLink, conf.VFID, conf.OrigVfState.Vlan); err != nil {
 			return fmt.Errorf("failed to restore vf %d vlan: %v", conf.VFID, err)
 		}
 	}
 
-	// Restore spoofchk
-	if conf.SpoofChk != "" {
-		if err = m.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, conf.OrigVfState.SpoofChk); err != nil {
-			return fmt.Errorf("failed to restore spoofchk for vf %d: %v", conf.VFID, err)
-		}
-	}
-
 	// Restore the original administrative MAC address
-	if conf.MAC != "" {
+	if conf.OrigVfState.EffectiveMAC != "" {
 		var hwaddr net.HardwareAddr
 		hwaddr, err = net.ParseMAC(conf.OrigVfState.AdminMAC)
 		if err != nil {
@@ -456,14 +406,6 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 		// for now, just set VF trust to off if it was specified by the user in netconf
 		if err = m.nLink.LinkSetVfTrust(pfLink, conf.VFID, false); err != nil {
 			return fmt.Errorf("failed to disable trust for vf %d: %v", conf.VFID, err)
-		}
-	}
-
-	// Restore rate limiting
-	if conf.MinTxRate != nil || conf.MaxTxRate != nil {
-		err = m.nLink.LinkSetVfRate(pfLink, conf.VFID, conf.OrigVfState.MinTxRate, conf.OrigVfState.MaxTxRate)
-		if err != nil {
-			return fmt.Errorf("failed to disable rate limiting for vf %d %v", conf.VFID, err)
 		}
 	}
 

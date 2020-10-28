@@ -159,7 +159,7 @@ func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
 // SaveNetConf takes in container ID, data dir and Pod interface name as string and a json encoded struct Conf
 // and save this Conf in data dir
 func SaveNetConf(cid, dataDir, podIfName string, conf interface{}) error {
-	netConfBytes, err := json.Marshal(conf)
+	confBytes, err := json.Marshal(conf)
 	if err != nil {
 		return fmt.Errorf("error serializing delegate netconf: %v", err)
 	}
@@ -167,8 +167,8 @@ func SaveNetConf(cid, dataDir, podIfName string, conf interface{}) error {
 	s := []string{cid, podIfName}
 	cRef := strings.Join(s, "-")
 
-	// save the rendered netconf for cmdDel
-	if err := saveScratchNetConf(cRef, dataDir, netConfBytes); err != nil {
+	// save the rendered conf for cmdDel
+	if err := saveScratchNetConf(cRef, dataDir, confBytes); err != nil {
 		return err
 	}
 
@@ -190,7 +190,7 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 	return err
 }
 
-// ReadScratchNetConf takes in container ID, Pod interface name and data dir as string and returns a pointer to Conf
+// ReadScratchNetConf takes a path to cached Conf and returns a Conf bytes
 func ReadScratchNetConf(cRefPath string) ([]byte, error) {
 	data, err := ioutil.ReadFile(cRefPath)
 	if err != nil {
@@ -200,7 +200,7 @@ func ReadScratchNetConf(cRefPath string) ([]byte, error) {
 	return data, err
 }
 
-// CleanCachedNetConf removed cached NetConf from disk
+// CleanCachedNetConf removed cached Conf from disk
 func CleanCachedNetConf(cRefPath string) error {
 	if err := os.Remove(cRefPath); err != nil {
 		return fmt.Errorf("error removing NetConf file %s: %q", cRefPath, err)

@@ -83,13 +83,15 @@ var _ = Describe("Manager", func() {
 			podifName = "net1"
 			contID = "dummycid"
 			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
-				OrigVfState: types.VfState{
-					HostIFName: "enp175s6",
+				VfConf: types.VfConf{
+					Master:      "enp175s0f1",
+					VFID:        0,
+					ContIFNames: "net1",
+					OrigVfState: types.VfState{
+						HostIFName: "enp175s6",
+					},
 				},
+				DeviceID: "0000:af:06.0",
 			}
 			t = GinkgoT()
 		})
@@ -123,8 +125,8 @@ var _ = Describe("Manager", func() {
 			mocked := &mocks.NetlinkManager{}
 			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
 			Expect(err).NotTo(HaveOccurred())
-			netconf.MAC = "e4:11:22:33:44:55"
-			expMac, err := net.ParseMAC(netconf.MAC)
+			netconf.RuntimeConfig.Mac = "e4:11:22:33:44:55"
+			expMac, err := net.ParseMAC(netconf.RuntimeConfig.Mac)
 			Expect(err).NotTo(HaveOccurred())
 
 			fakeLink := &FakeLink{netlink.LinkAttrs{
@@ -142,7 +144,7 @@ var _ = Describe("Manager", func() {
 			m := manager{nLink: mocked}
 			macAddr, err := m.SetupVF(netconf, podifName, contID, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(macAddr).To(Equal(netconf.MAC))
+			Expect(macAddr).To(Equal(netconf.RuntimeConfig.Mac))
 			mocked.AssertExpectations(t)
 		})
 	})
@@ -158,13 +160,15 @@ var _ = Describe("Manager", func() {
 			podifName = "net1"
 			contID = "dummycid"
 			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
-				OrigVfState: types.VfState{
-					HostIFName: "enp175s6",
+				VfConf: types.VfConf{
+					Master:      "enp175s0f1",
+					VFID:        0,
+					ContIFNames: "net1",
+					OrigVfState: types.VfState{
+						HostIFName: "enp175s6",
+					},
 				},
+				DeviceID: "0000:af:06.0",
 			}
 		})
 		It("Assuming existing interface", func() {
@@ -193,16 +197,18 @@ var _ = Describe("Manager", func() {
 			podifName = "net1"
 			contID = "dummycid"
 			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				MAC:         "aa:f3:8d:65:1b:d4",
-				ContIFNames: "net1",
-				OrigVfState: types.VfState{
-					HostIFName:   "enp175s6",
-					EffectiveMAC: "c6:c8:7f:1f:21:90",
+				VfConf: types.VfConf{
+					Master:      "enp175s0f1",
+					VFID:        0,
+					ContIFNames: "net1",
+					OrigVfState: types.VfState{
+						HostIFName:   "enp175s6",
+						EffectiveMAC: "c6:c8:7f:1f:21:90",
+					},
 				},
+				DeviceID: "0000:af:06.0",
 			}
+			netconf.RuntimeConfig.Mac = "aa:f3:8d:65:1b:d4"
 		})
 		It("Restores Effective MAC address when provided in netconf", func() {
 			targetNetNS := newFakeNs()
@@ -229,13 +235,15 @@ var _ = Describe("Manager", func() {
 
 		BeforeEach(func() {
 			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
-				OrigVfState: types.VfState{
-					HostIFName: "enp175s6",
+				VfConf: types.VfConf{
+					Master:      "enp175s0f1",
+					VFID:        0,
+					ContIFNames: "net1",
+					OrigVfState: types.VfState{
+						HostIFName: "enp175s6",
+					},
 				},
+				DeviceID: "0000:af:06.0",
 			}
 		})
 		It("Does not change VF config if it wasnt requested to be changed in netconf", func() {
@@ -262,45 +270,43 @@ var _ = Describe("Manager", func() {
 			minTxRate := 1000
 
 			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        3,
-				ContIFNames: "net1",
-				MAC:         "d2:fc:22:a7:0d:e8",
-				Vlan:        &vlan,
-				VlanQoS:     &vlanQos,
-				SpoofChk:    "on",
-				MaxTxRate:   &maxTxRate,
-				MinTxRate:   &minTxRate,
-				Trust:       "on",
-				LinkState:   "enable",
-				OrigVfState: types.VfState{
-					HostIFName:   "enp175s6",
-					SpoofChk:     false,
-					AdminMAC:     "aa:f3:8d:65:1b:d4",
-					EffectiveMAC: "aa:f3:8d:65:1b:d4",
-					Vlan:         1,
-					VlanQoS:      1,
-					MinTxRate:    0,
-					MaxTxRate:    0,
-					LinkState:    2, // disable
+				VfConf: types.VfConf{
+					Master:      "enp175s0f1",
+					VFID:        3,
+					ContIFNames: "net1",
+					Trust:       "on",
+					LinkState:   "enable",
+					OrigVfState: types.VfState{
+						HostIFName:   "enp175s6",
+						SpoofChk:     false,
+						AdminMAC:     "aa:f3:8d:65:1b:d4",
+						EffectiveMAC: "aa:f3:8d:65:1b:d4",
+						Vlan:         1,
+						VlanQoS:      1,
+						MinTxRate:    0,
+						MaxTxRate:    0,
+						LinkState:    2, // disable
+					},
 				},
+				DeviceID:  "0000:af:06.0",
+				Vlan:      &vlan,
+				VlanQoS:   &vlanQos,
+				SpoofChk:  "on",
+				MaxTxRate: &maxTxRate,
+				MinTxRate: &minTxRate,
 			}
+			netconf.RuntimeConfig.Mac = "d2:fc:22:a7:0d:e8"
 		})
 		It("Restores original VF configurations", func() {
 			mocked := &mocks.NetlinkManager{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
-			mocked.On("LinkSetVfVlanQos", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan,
-				netconf.OrigVfState.VlanQoS).Return(nil)
-			mocked.On("LinkSetVfSpoofchk", fakeLink, netconf.VFID, netconf.OrigVfState.SpoofChk).Return(nil)
+			mocked.On("LinkSetVfVlan", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan).Return(nil)
 			origMac, err := net.ParseMAC(netconf.OrigVfState.AdminMAC)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, origMac).Return(nil)
 			mocked.On("LinkSetVfTrust", fakeLink, netconf.VFID, false).Return(nil)
-			mocked.On("LinkSetVfRate", fakeLink, netconf.VFID, netconf.OrigVfState.MinTxRate,
-				netconf.OrigVfState.MaxTxRate).Return(nil)
 			mocked.On("LinkSetVfState", fakeLink, netconf.VFID, netconf.OrigVfState.LinkState).Return(nil)
 
 			m := manager{nLink: mocked}
@@ -316,10 +322,12 @@ var _ = Describe("Manager", func() {
 
 		BeforeEach(func() {
 			netconf = &types.NetConf{
-				Representor: "dummylink",
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
+				VfConf: types.VfConf{
+					Representor: "dummylink",
+					Master:      "enp175s0f1",
+					VFID:        0,
+				},
+				DeviceID: "0000:af:06.0",
 			}
 			// Mute logger
 			zerolog.SetGlobalLevel(zerolog.Disabled)
@@ -379,10 +387,12 @@ var _ = Describe("Manager", func() {
 
 		BeforeEach(func() {
 			netconf = &types.NetConf{
-				Representor: "dummylink",
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
+				VfConf: types.VfConf{
+					Representor: "dummylink",
+					Master:      "enp175s0f1",
+					VFID:        0,
+				},
+				DeviceID: "0000:af:06.0",
 			}
 			// Mute logger
 			zerolog.SetGlobalLevel(zerolog.Disabled)

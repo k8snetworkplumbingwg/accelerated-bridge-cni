@@ -21,8 +21,10 @@ const (
 // LoadConf parses and validates stdin netconf and returns NetConf object
 func LoadConf(bytes []byte) (*localtypes.NetConf, error) {
 	n := &localtypes.NetConf{
-		Debug:  false,
-		Bridge: DefaultBridge,
+		VfConf: localtypes.VfConf{
+			Bridge: DefaultBridge,
+		},
+		Debug: false,
 	}
 	if err := json.Unmarshal(bytes, n); err != nil {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)
@@ -98,7 +100,7 @@ func getVfInfo(vfPci string) (string, int, error) {
 	return pf, vfID, nil
 }
 
-// LoadConfFromCache retrieves cached NetConf returns it along with a handle for removal
+// LoadConfFromCache retrieves cached Conf and returns it in the NetConf struct along with a handle for removal
 func LoadConfFromCache(args *skel.CmdArgs) (*localtypes.NetConf, string, error) {
 	netConf := &localtypes.NetConf{}
 
@@ -106,12 +108,12 @@ func LoadConfFromCache(args *skel.CmdArgs) (*localtypes.NetConf, string, error) 
 	cRef := strings.Join(s, "-")
 	cRefPath := filepath.Join(DefaultCNIDir, cRef)
 
-	netConfBytes, err := utils.ReadScratchNetConf(cRefPath)
+	confBytes, err := utils.ReadScratchNetConf(cRefPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("error reading cached NetConf in %s with name %s", DefaultCNIDir, cRef)
 	}
 
-	if err = json.Unmarshal(netConfBytes, netConf); err != nil {
+	if err = json.Unmarshal(confBytes, &netConf.VfConf); err != nil {
 		return nil, "", fmt.Errorf("failed to parse NetConf: %q", err)
 	}
 

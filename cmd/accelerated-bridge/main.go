@@ -21,29 +21,12 @@ import (
 	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/utils"
 )
 
-type envArgs struct {
-	types.CommonArgs
-	MAC types.UnmarshallableString `json:"mac,omitempty"`
-}
-
 //nolint:gochecknoinits
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
 	// since namespace ops (unshare, setns) are done for a single thread, we
 	// must ensure that the goroutine does not jump from OS thread to thread
 	runtime.LockOSThread()
-}
-
-func getEnvArgs(envArgsString string) (*envArgs, error) {
-	if envArgsString != "" {
-		e := envArgs{}
-		err := types.LoadArgs(envArgsString, &e)
-		if err != nil {
-			return nil, err
-		}
-		return &e, nil
-	}
-	return nil, nil
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
@@ -61,25 +44,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	if netConf.Debug {
 		setDebugMode()
-	}
-
-	envArgs, err := getEnvArgs(args.Args)
-	if err != nil {
-		return fmt.Errorf("failed to parse args: %v", err)
-	}
-
-	if envArgs != nil {
-		MAC := string(envArgs.MAC)
-		if MAC != "" {
-			netConf.MAC = MAC
-		}
-	}
-
-	// RuntimeConfig takes preference than envArgs.
-	// This maintains compatibility of using envArgs
-	// for MAC config.
-	if netConf.RuntimeConfig.Mac != "" {
-		netConf.MAC = netConf.RuntimeConfig.Mac
 	}
 
 	netns, err := ns.GetNS(args.Netns)
@@ -167,8 +131,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		result = newResult
 	}
 
-	// Cache NetConf for CmdDel
-	if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
+	// Cache VfConf for CmdDel
+	if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, &netConf.VfConf); err != nil {
 		return fmt.Errorf("error saving NetConf %q", err)
 	}
 
