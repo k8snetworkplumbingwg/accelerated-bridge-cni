@@ -1,7 +1,7 @@
 # Package related
 BINARY_NAME     = accelerated-bridge
 PACKAGE         = accelerated-bridge-cni
-ORG_PATH        = github.com/DmytroLinkin
+ORG_PATH        = github.com/Mellanox
 REPO_PATH       = $(ORG_PATH)/$(PACKAGE)
 GOPATH          = $(CURDIR)/.gopath
 GOBIN           = $(CURDIR)/bin
