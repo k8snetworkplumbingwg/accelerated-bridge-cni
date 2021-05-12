@@ -44,7 +44,7 @@ To deploy Accelerated Bridge CNI by itself on a Kubernetes 1.16+ cluster:
 
 
 ## Usage
-Accelerated Bridge CNI networks are commonly configured using Multus and Accelerated Bridge Device Plugin using Network Attachment Definitions. More information about configuring Kubernetes networks using this pattern can be found in the [Multus configuration reference document.](https://intel.github.io/multus-cni/doc/configuration.html)
+Accelerated Bridge CNI networks are commonly configured using Multus and SR-IOV Device Plugin using Network Attachment Definitions. More information about configuring Kubernetes networks using this pattern can be found in the [Multus configuration reference document.](https://intel.github.io/multus-cni/doc/configuration.html)
 
 A Network Attachment Definition for Accelerated Bridge CNI takes the form:
 
@@ -113,8 +113,6 @@ This configuration sets a number of extra parameters that may be key for Acceler
   "name": "some-net-advanced",
   "type": "accelerated-bridge",
   "vlan": 1000,
-  "spoofchk": "off",
-  "trust": "on",
   "ipam": {
     "type": "host-local",
     "subnet": "10.56.217.0/24",
@@ -126,22 +124,10 @@ This configuration sets a number of extra parameters that may be key for Acceler
 }
 ```
 
-#### DPDK userspace driver config
-
-The below config will configure a VF using a userspace driver (uio/vfio) for use in a container. If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored. Other config parameters should be applicable but implementation may be driver specific.
-
-```json
-{
-    "cniVersion": "0.3.1",
-    "name": "some-net-dpdk",
-    "type": "accelerated-bridge",
-    "vlan": 1000
-}
-```
 
 ### Advanced Configuration
 
-Accelerated Bridge CNI allows the setting of SR-IOV options such a link-state and quality of service parameters. To learn more about how these parameters are set consult the [Accelerated Bridge CNI configuration reference guide](docs/configuration-reference.md)
+To learn more about available configuration parameters, check [Accelerated Bridge CNI configuration reference guide](docs/configuration-reference.md)
 
 ## Contributing
 To report a bug or request a feature, open an issue on this repo using one of the available templates.
