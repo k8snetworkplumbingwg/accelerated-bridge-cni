@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/vishvananda/netlink"
 
-	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/types"
-	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/types/mocks"
+	"github.com/Mellanox/accelerated-bridge-cni/pkg/types"
+	"github.com/Mellanox/accelerated-bridge-cni/pkg/types/mocks"
 )
 
 // Fake NS - implements ns.NetNS interface

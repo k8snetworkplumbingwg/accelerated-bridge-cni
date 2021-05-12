@@ -8,8 +8,8 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 
-	localtypes "github.com/DmytroLinkin/accelerated-bridge-cni/pkg/types"
-	"github.com/DmytroLinkin/accelerated-bridge-cni/pkg/utils"
+	localtypes "github.com/Mellanox/accelerated-bridge-cni/pkg/types"
+	"github.com/Mellanox/accelerated-bridge-cni/pkg/utils"
 )
 
 const (

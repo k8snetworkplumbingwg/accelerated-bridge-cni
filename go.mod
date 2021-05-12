@@ -1,4 +1,4 @@
-module github.com/DmytroLinkin/accelerated-bridge-cni
+module github.com/Mellanox/accelerated-bridge-cni
 
 go 1.13
 
