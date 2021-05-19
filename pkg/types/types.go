@@ -21,7 +21,7 @@ type NetConf struct {
 	MAC           string
 	Representor   string // VF's representor attached to the bridge; used during deletion
 	Bridge        string `json:"bridge,omitempty"` // bridge used to attach representor to it, default is "cni0"
-	Vlan          *int   `json:"vlan"`
+	Vlan          int    `json:"vlan"`
 	DeviceID      string `json:"deviceID"` // PCI address of a VF in valid sysfs format
 	VFID          int
 	ContIFNames   string // VF names after in the container; used during deletion

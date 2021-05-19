@@ -256,15 +256,13 @@ var _ = Describe("Manager", func() {
 		)
 
 		BeforeEach(func() {
-			vlan := 6
-
 			netconf = &types.NetConf{
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
 				VFID:        3,
 				ContIFNames: "net1",
 				MAC:         "d2:fc:22:a7:0d:e8",
-				Vlan:        &vlan,
+				Vlan:        6,
 				OrigVfState: types.VfState{
 					HostIFName:   "enp175s6",
 					AdminMAC:     "aa:f3:8d:65:1b:d4",
@@ -298,6 +296,7 @@ var _ = Describe("Manager", func() {
 				Representor: "dummylink",
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
+				Vlan:        100,
 				VFID:        0,
 			}
 			// Mute logger
@@ -321,6 +320,7 @@ var _ = Describe("Manager", func() {
 				bridge := args.Get(1).(netlink.Link)
 				link.Attrs().MasterIndex = bridge.Attrs().Index
 			}).Return(nil)
+			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(100), true, true, false, true).Return(nil)
 
 			m := manager{nLink: mockedNl, sriov: mockedSr}
 			err := m.AttachRepresentor(netconf)

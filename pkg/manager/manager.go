@@ -37,6 +37,8 @@ type NetlinkManager interface {
 	LinkSetVfState(netlink.Link, int, uint32) error
 	LinkSetMaster(netlink.Link, netlink.Link) error
 	LinkSetNoMaster(netlink.Link) error
+	BridgeVlanAdd(netlink.Link, uint16, bool, bool, bool, bool) error
+	BridgeVlanDel(netlink.Link, uint16, bool, bool, bool, bool) error
 }
 
 // MyNetlink NetlinkManager
@@ -116,6 +118,16 @@ func (n *MyNetlink) LinkSetMaster(link, master netlink.Link) error {
 // LinkSetNoMaster using NetlinkManager
 func (n *MyNetlink) LinkSetNoMaster(link netlink.Link) error {
 	return netlink.LinkSetNoMaster(link)
+}
+
+// BridgeVlanAdd using NetlinkManager
+func (n *MyNetlink) BridgeVlanAdd(link netlink.Link, vid uint16, pvid, untagged, self, master bool) error {
+	return netlink.BridgeVlanAdd(link, vid, pvid, untagged, self, master)
+}
+
+// BridgeVlanDel using NetlinkManager
+func (n *MyNetlink) BridgeVlanDel(link netlink.Link, vid uint16, pvid, untagged, self, master bool) error {
+	return netlink.BridgeVlanDel(link, vid, pvid, untagged, self, master)
 }
 
 type pciUtils interface {
@@ -379,7 +391,24 @@ func (m *manager) AttachRepresentor(conf *types.NetConf) error {
 	}
 
 	log.Info().Msgf("Attaching rep %s to the bridge %s", conf.Representor, conf.Bridge)
-	return m.nLink.LinkSetMaster(rep, bridge)
+
+	if err = m.nLink.LinkSetMaster(rep, bridge); err != nil {
+		return fmt.Errorf("failed to add representor %s to bridge: %v", conf.Representor, err)
+	}
+
+	defer func() {
+		if err != nil {
+			_ = m.nLink.LinkSetNoMaster(rep)
+		}
+	}()
+
+	if conf.Vlan != 0 {
+		if err = m.nLink.BridgeVlanAdd(rep, uint16(conf.Vlan), true, true, false, true); err != nil {
+			return fmt.Errorf("failed to set VLAN for representor %s: %v", conf.Representor, err)
+		}
+	}
+
+	return nil
 }
 
 func (m *manager) DetachRepresentor(conf *types.NetConf) error {

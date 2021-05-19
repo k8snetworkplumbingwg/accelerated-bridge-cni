@@ -52,11 +52,9 @@ func LoadConf(bytes []byte) (*localtypes.NetConf, error) {
 
 	n.OrigVfState.HostIFName = hostIFName
 
-	if n.Vlan != nil {
-		// validate vlan id range
-		if *n.Vlan < 0 || *n.Vlan > 4094 {
-			return nil, fmt.Errorf("vlan id %d invalid: value must be in the range 0-4094", *n.Vlan)
-		}
+	// validate vlan id range
+	if n.Vlan < 0 || n.Vlan > 4094 {
+		return nil, fmt.Errorf("vlan id %d invalid: value must be in the range 0-4094", n.Vlan)
 	}
 
 	return n, nil
