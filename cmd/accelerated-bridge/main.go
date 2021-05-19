@@ -89,12 +89,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 	defer netns.Close()
 
 	m := manager.NewManager()
-	if err = m.AttachRepresentor(netConf); err != nil {
-		return fmt.Errorf("failed to attach representor: %v", err)
+	if err = m.AddToBridge(netConf); err != nil {
+		return fmt.Errorf("failed to add required configuration for bridge: %v", err)
 	}
 	defer func() {
 		if err != nil {
-			_ = m.DetachRepresentor(netConf)
+			_ = m.DelFromBridge(netConf)
 		}
 	}()
 
@@ -206,8 +206,8 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	m := manager.NewManager()
 
-	if err = m.DetachRepresentor(netConf); err != nil {
-		log.Warn().Msgf("failed to detach representor: %v", err)
+	if err = m.DelFromBridge(netConf); err != nil {
+		log.Warn().Msgf("failed to remove configuration from bridge: %v", err)
 	}
 
 	if netConf.IPAM.Type != "" {

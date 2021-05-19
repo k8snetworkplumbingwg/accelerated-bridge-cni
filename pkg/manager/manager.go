@@ -169,8 +169,8 @@ type Manager interface {
 	ReleaseVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) error
 	ResetVFConfig(conf *types.NetConf) error
 	ApplyVFConfig(conf *types.NetConf) error
-	AttachRepresentor(conf *types.NetConf) error
-	DetachRepresentor(conf *types.NetConf) error
+	AddToBridge(conf *types.NetConf) error
+	DelFromBridge(conf *types.NetConf) error
 }
 
 type manager struct {
@@ -370,12 +370,44 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 	return nil
 }
 
-func (m *manager) AttachRepresentor(conf *types.NetConf) error {
+// AddToBridge adds VF representor and uplink PF to the brdige and apply VLAN configuration
+func (m *manager) AddToBridge(conf *types.NetConf) error {
 	bridge, err := m.nLink.LinkByName(conf.Bridge)
 	if err != nil {
 		return fmt.Errorf("failed to get bridge link %s: %v", conf.Bridge, err)
 	}
 
+	if err := m.addPFToBridge(bridge, conf); err != nil {
+		return err
+	}
+
+	if err := m.addRepresentorToBridge(bridge, conf); err != nil {
+		return err
+	}
+
+	if err := m.nLink.LinkSetUp(bridge); err != nil {
+		return fmt.Errorf("failed to set bridge %s up: %v", conf.Bridge, err)
+	}
+
+	return nil
+}
+
+func (m *manager) addPFToBridge(bridge netlink.Link, conf *types.NetConf) error {
+	pf, err := m.nLink.LinkByName(conf.Master)
+	if err != nil {
+		return fmt.Errorf("failed to get pf link %s: %v", conf.Master, err)
+	}
+	if err = m.nLink.LinkSetMaster(pf, bridge); err != nil {
+		return fmt.Errorf("failed to add PF %s to bridge: %v", conf.Master, err)
+	}
+	if err = m.nLink.LinkSetUp(pf); err != nil {
+		return fmt.Errorf("failed to set PF %s up: %v", conf.Master, err)
+	}
+	return nil
+}
+
+func (m *manager) addRepresentorToBridge(bridge netlink.Link, conf *types.NetConf) error {
+	var err error
 	conf.Representor, err = m.sriov.GetVfRepresentor(conf.Master, conf.VFID)
 	if err != nil {
 		return fmt.Errorf("failed to get VF's %d representor on NIC %s: %v", conf.VFID, conf.Master, err)
@@ -384,10 +416,6 @@ func (m *manager) AttachRepresentor(conf *types.NetConf) error {
 	var rep netlink.Link
 	if rep, err = m.nLink.LinkByName(conf.Representor); err != nil {
 		return fmt.Errorf("failed to get representor link %s: %v", conf.Representor, err)
-	}
-
-	if err = m.nLink.LinkSetUp(rep); err != nil {
-		return fmt.Errorf("failed to set representor %s up: %v", conf.Representor, err)
 	}
 
 	log.Info().Msgf("Attaching rep %s to the bridge %s", conf.Representor, conf.Bridge)
@@ -408,10 +436,15 @@ func (m *manager) AttachRepresentor(conf *types.NetConf) error {
 		}
 	}
 
+	if err = m.nLink.LinkSetUp(rep); err != nil {
+		return fmt.Errorf("failed to set representor %s up: %v", conf.Representor, err)
+	}
+
 	return nil
 }
 
-func (m *manager) DetachRepresentor(conf *types.NetConf) error {
+// DelFromBridge delete VF representor from the bridge
+func (m *manager) DelFromBridge(conf *types.NetConf) error {
 	rep, err := m.nLink.LinkByName(conf.Representor)
 	if err != nil {
 		return fmt.Errorf("failed to get representor %s link: %v", conf.Representor, err)

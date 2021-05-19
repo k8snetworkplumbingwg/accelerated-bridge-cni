@@ -286,7 +286,7 @@ var _ = Describe("Manager", func() {
 			mocked.AssertExpectations(t)
 		})
 	})
-	Context("Checking AttachRepresentor function", func() {
+	Context("Checking AddToBridge function", func() {
 		var (
 			netconf *types.NetConf
 		)
@@ -310,20 +310,30 @@ var _ = Describe("Manager", func() {
 				Name:        netconf.Representor,
 				MasterIndex: 0,
 			}}
+			fakePF := &FakeLink{netlink.LinkAttrs{
+				Name: netconf.Master,
+			}}
 
 			mockedNl.On("LinkByName", netconf.Bridge).Return(fakeBridge, nil)
 			mockedNl.On("LinkByName", netconf.Representor).Return(fakeLink, nil)
+			mockedNl.On("LinkByName", netconf.Master).Return(fakePF, nil)
 			mockedSr.On("GetVfRepresentor", netconf.Master, netconf.VFID).Return(fakeLink.Name, nil)
 			mockedNl.On("LinkSetUp", fakeLink).Return(nil)
+			mockedNl.On("LinkSetUp", fakePF).Return(nil)
+			mockedNl.On("LinkSetUp", fakeBridge).Return(nil)
 			mockedNl.On("LinkSetMaster", fakeLink, fakeBridge).Run(func(args mock.Arguments) {
 				link := args.Get(0).(netlink.Link)
 				bridge := args.Get(1).(netlink.Link)
 				link.Attrs().MasterIndex = bridge.Attrs().Index
 			}).Return(nil)
+			mockedNl.On("LinkSetMaster", fakePF, fakeBridge).Run(func(args mock.Arguments) {
+				link := args.Get(0).(netlink.Link)
+				bridge := args.Get(1).(netlink.Link)
+				link.Attrs().MasterIndex = bridge.Attrs().Index
+			}).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(100), true, true, false, true).Return(nil)
-
 			m := manager{nLink: mockedNl, sriov: mockedSr}
-			err := m.AttachRepresentor(netconf)
+			err := m.AddToBridge(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fakeLink.Attrs().MasterIndex).To(Equal(fakeBridge.Attrs().Index))
 			mockedNl.AssertExpectations(t)
@@ -333,25 +343,21 @@ var _ = Describe("Manager", func() {
 			mockedNl := &mocks.NetlinkManager{}
 			mockedSr := &mocks.Sriovnet{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: "cni0"}}
-			fakeLink := &FakeLink{netlink.LinkAttrs{
-				Name:        netconf.Representor,
-				MasterIndex: 0,
+			fakePF := &FakeLink{netlink.LinkAttrs{
+				Name: netconf.Master,
 			}}
-
 			mockedNl.On("LinkByName", netconf.Bridge).Return(fakeBridge, nil)
-			mockedNl.On("LinkByName", netconf.Representor).Return(fakeLink, nil)
-			mockedSr.On("GetVfRepresentor", netconf.Master, netconf.VFID).Return(fakeLink.Name, nil)
-			mockedNl.On("LinkSetUp", fakeLink).Return(nil)
-			mockedNl.On("LinkSetMaster", fakeLink, fakeBridge).Return(errors.New("some error"))
+			mockedNl.On("LinkByName", netconf.Master).Return(fakePF, nil)
+			mockedNl.On("LinkSetMaster", fakePF, fakeBridge).Return(errors.New("some error"))
 
 			m := manager{nLink: mockedNl, sriov: mockedSr}
-			err := m.AttachRepresentor(netconf)
+			err := m.AddToBridge(netconf)
 			Expect(err).To(HaveOccurred())
 			mockedNl.AssertExpectations(t)
 			mockedSr.AssertExpectations(t)
 		})
 	})
-	Context("Checking DetachRepresentor function", func() {
+	Context("Checking DelFromBridge function", func() {
 		var (
 			netconf *types.NetConf
 		)
@@ -381,7 +387,7 @@ var _ = Describe("Manager", func() {
 			}).Return(nil)
 
 			m := manager{nLink: mocked}
-			err := m.DetachRepresentor(netconf)
+			err := m.DelFromBridge(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fakeLink.Attrs().MasterIndex).To(Equal(0))
 			mocked.AssertExpectations(t)
@@ -398,7 +404,7 @@ var _ = Describe("Manager", func() {
 			mocked.On("LinkSetNoMaster", fakeLink).Return(errors.New("some error"))
 
 			m := manager{nLink: mocked}
-			err := m.DetachRepresentor(netconf)
+			err := m.DelFromBridge(netconf)
 			Expect(err).To(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
