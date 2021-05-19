@@ -400,6 +400,11 @@ func (m *manager) addPFToBridge(bridge netlink.Link, conf *types.NetConf) error 
 	if err = m.nLink.LinkSetMaster(pf, bridge); err != nil {
 		return fmt.Errorf("failed to add PF %s to bridge: %v", conf.Master, err)
 	}
+	if conf.Vlan != 0 {
+		if err = m.nLink.BridgeVlanAdd(pf, uint16(conf.Vlan), false, false, false, true); err != nil {
+			return fmt.Errorf("failed to add VLAN for PF %s: %v", conf.Master, err)
+		}
+	}
 	if err = m.nLink.LinkSetUp(pf); err != nil {
 		return fmt.Errorf("failed to set PF %s up: %v", conf.Master, err)
 	}
