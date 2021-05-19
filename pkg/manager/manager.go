@@ -37,6 +37,8 @@ type NetlinkManager interface {
 	LinkSetVfState(netlink.Link, int, uint32) error
 	LinkSetMaster(netlink.Link, netlink.Link) error
 	LinkSetNoMaster(netlink.Link) error
+	BridgeVlanAdd(netlink.Link, uint16, bool, bool, bool, bool) error
+	BridgeVlanDel(netlink.Link, uint16, bool, bool, bool, bool) error
 }
 
 // MyNetlink NetlinkManager
@@ -116,6 +118,16 @@ func (n *MyNetlink) LinkSetMaster(link, master netlink.Link) error {
 // LinkSetNoMaster using NetlinkManager
 func (n *MyNetlink) LinkSetNoMaster(link netlink.Link) error {
 	return netlink.LinkSetNoMaster(link)
+}
+
+// BridgeVlanAdd using NetlinkManager
+func (n *MyNetlink) BridgeVlanAdd(link netlink.Link, vid uint16, pvid, untagged, self, master bool) error {
+	return netlink.BridgeVlanAdd(link, vid, pvid, untagged, self, master)
+}
+
+// BridgeVlanDel using NetlinkManager
+func (n *MyNetlink) BridgeVlanDel(link netlink.Link, vid uint16, pvid, untagged, self, master bool) error {
+	return netlink.BridgeVlanDel(link, vid, pvid, untagged, self, master)
 }
 
 type pciUtils interface {
@@ -318,24 +330,8 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 	if vfState == nil {
 		return fmt.Errorf("failed to find vf %d", conf.VFID)
 	}
-	conf.OrigVfState.FillFromVfInfo(vfState)
 
-	// 1. Set vlan
-	if conf.Vlan != nil {
-		// set vlan qos if present in the config
-		if conf.VlanQoS != nil {
-			if err = m.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS); err != nil {
-				return fmt.Errorf("failed to set vf %d vlan configuration: %v", conf.VFID, err)
-			}
-		} else {
-			// set vlan id field only
-			if err = m.nLink.LinkSetVfVlan(pfLink, conf.VFID, *conf.Vlan); err != nil {
-				return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
-			}
-		}
-	}
-
-	// 2. Set mac address
+	// Set mac address
 	if conf.MAC != "" {
 		var hwaddr net.HardwareAddr
 		hwaddr, err = net.ParseMAC(conf.MAC)
@@ -345,67 +341,6 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 
 		if err = m.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
 			return fmt.Errorf("failed to set MAC address to %s: %v", hwaddr, err)
-		}
-	}
-
-	// 3. Set min/max tx link rate. 0 means no rate limiting. Support depends on NICs and driver.
-	var minTxRate, maxTxRate int
-	rateConfigured := false
-	if conf.MinTxRate != nil {
-		minTxRate = *conf.MinTxRate
-		rateConfigured = true
-	}
-
-	if conf.MaxTxRate != nil {
-		maxTxRate = *conf.MaxTxRate
-		rateConfigured = true
-	}
-
-	if rateConfigured {
-		if err = m.nLink.LinkSetVfRate(pfLink, conf.VFID, minTxRate, maxTxRate); err != nil {
-			return fmt.Errorf("failed to set vf %d min_tx_rate to %d Mbps: max_tx_rate to %d Mbps: %v",
-				conf.VFID, minTxRate, maxTxRate, err)
-		}
-	}
-
-	// 4. Set spoofchk flag
-	if conf.SpoofChk != "" {
-		spoofChk := false
-		if conf.SpoofChk == ON {
-			spoofChk = true
-		}
-		if err = m.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, spoofChk); err != nil {
-			return fmt.Errorf("failed to set vf %d spoofchk flag to %s: %v", conf.VFID, conf.SpoofChk, err)
-		}
-	}
-
-	// 5. Set trust flag
-	if conf.Trust != "" {
-		trust := false
-		if conf.Trust == ON {
-			trust = true
-		}
-		if err = m.nLink.LinkSetVfTrust(pfLink, conf.VFID, trust); err != nil {
-			return fmt.Errorf("failed to set vf %d trust flag to %s: %v", conf.VFID, conf.Trust, err)
-		}
-	}
-
-	// 6. Set link state
-	if conf.LinkState != "" {
-		var state uint32
-		switch conf.LinkState {
-		case "auto":
-			state = netlink.VF_LINK_STATE_AUTO
-		case "enable":
-			state = netlink.VF_LINK_STATE_ENABLE
-		case "disable":
-			state = netlink.VF_LINK_STATE_DISABLE
-		default:
-			// the value should have been validated earlier, return error if we somehow got here
-			return fmt.Errorf("unknown link state %s when setting it for vf %d: %v", conf.LinkState, conf.VFID, err)
-		}
-		if err = m.nLink.LinkSetVfState(pfLink, conf.VFID, state); err != nil {
-			return fmt.Errorf("failed to set vf %d link state to %d: %v", conf.VFID, state, err)
 		}
 	}
 
@@ -419,24 +354,6 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
-	// Restore VLAN
-	if conf.Vlan != nil {
-		if conf.VlanQoS != nil {
-			if err = m.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS); err != nil {
-				return fmt.Errorf("failed to restore vf %d vlan: %v", conf.VFID, err)
-			}
-		} else if err = m.nLink.LinkSetVfVlan(pfLink, conf.VFID, conf.OrigVfState.Vlan); err != nil {
-			return fmt.Errorf("failed to restore vf %d vlan: %v", conf.VFID, err)
-		}
-	}
-
-	// Restore spoofchk
-	if conf.SpoofChk != "" {
-		if err = m.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, conf.OrigVfState.SpoofChk); err != nil {
-			return fmt.Errorf("failed to restore spoofchk for vf %d: %v", conf.VFID, err)
-		}
-	}
-
 	// Restore the original administrative MAC address
 	if conf.MAC != "" {
 		var hwaddr net.HardwareAddr
@@ -447,32 +364,6 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 		}
 		if err = m.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
 			return fmt.Errorf("failed to restore original administrative MAC address %s: %v", hwaddr, err)
-		}
-	}
-
-	// Restore VF trust
-	if conf.Trust != "" {
-		// TODO: netlink go implementation does not support getting VF trust, need to add support there first
-		// for now, just set VF trust to off if it was specified by the user in netconf
-		if err = m.nLink.LinkSetVfTrust(pfLink, conf.VFID, false); err != nil {
-			return fmt.Errorf("failed to disable trust for vf %d: %v", conf.VFID, err)
-		}
-	}
-
-	// Restore rate limiting
-	if conf.MinTxRate != nil || conf.MaxTxRate != nil {
-		err = m.nLink.LinkSetVfRate(pfLink, conf.VFID, conf.OrigVfState.MinTxRate, conf.OrigVfState.MaxTxRate)
-		if err != nil {
-			return fmt.Errorf("failed to disable rate limiting for vf %d %v", conf.VFID, err)
-		}
-	}
-
-	// Restore link state to `auto`
-	if conf.LinkState != "" {
-		// Reset only when link_state was explicitly specified, to  accommodate for drivers / NICs
-		// that don't support the netlink command (e.g. igb driver)
-		if err = m.nLink.LinkSetVfState(pfLink, conf.VFID, conf.OrigVfState.LinkState); err != nil {
-			return fmt.Errorf("failed to set link state to auto for vf %d: %v", conf.VFID, err)
 		}
 	}
 
@@ -500,7 +391,24 @@ func (m *manager) AttachRepresentor(conf *types.NetConf) error {
 	}
 
 	log.Info().Msgf("Attaching rep %s to the bridge %s", conf.Representor, conf.Bridge)
-	return m.nLink.LinkSetMaster(rep, bridge)
+
+	if err = m.nLink.LinkSetMaster(rep, bridge); err != nil {
+		return fmt.Errorf("failed to add representor %s to bridge: %v", conf.Representor, err)
+	}
+
+	defer func() {
+		if err != nil {
+			_ = m.nLink.LinkSetNoMaster(rep)
+		}
+	}()
+
+	if conf.Vlan != 0 {
+		if err = m.nLink.BridgeVlanAdd(rep, uint16(conf.Vlan), true, true, false, true); err != nil {
+			return fmt.Errorf("failed to set VLAN for representor %s: %v", conf.Representor, err)
+		}
+	}
+
+	return nil
 }
 
 func (m *manager) DetachRepresentor(conf *types.NetConf) error {

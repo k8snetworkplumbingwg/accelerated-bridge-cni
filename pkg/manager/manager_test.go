@@ -256,34 +256,18 @@ var _ = Describe("Manager", func() {
 		)
 
 		BeforeEach(func() {
-			vlan := 6
-			vlanQos := 3
-			maxTxRate := 4000
-			minTxRate := 1000
-
 			netconf = &types.NetConf{
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
 				VFID:        3,
 				ContIFNames: "net1",
 				MAC:         "d2:fc:22:a7:0d:e8",
-				Vlan:        &vlan,
-				VlanQoS:     &vlanQos,
-				SpoofChk:    "on",
-				MaxTxRate:   &maxTxRate,
-				MinTxRate:   &minTxRate,
-				Trust:       "on",
-				LinkState:   "enable",
+				Vlan:        6,
 				OrigVfState: types.VfState{
 					HostIFName:   "enp175s6",
-					SpoofChk:     false,
 					AdminMAC:     "aa:f3:8d:65:1b:d4",
 					EffectiveMAC: "aa:f3:8d:65:1b:d4",
 					Vlan:         1,
-					VlanQoS:      1,
-					MinTxRate:    0,
-					MaxTxRate:    0,
-					LinkState:    2, // disable
 				},
 			}
 		})
@@ -292,16 +276,9 @@ var _ = Describe("Manager", func() {
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
-			mocked.On("LinkSetVfVlanQos", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan,
-				netconf.OrigVfState.VlanQoS).Return(nil)
-			mocked.On("LinkSetVfSpoofchk", fakeLink, netconf.VFID, netconf.OrigVfState.SpoofChk).Return(nil)
 			origMac, err := net.ParseMAC(netconf.OrigVfState.AdminMAC)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, origMac).Return(nil)
-			mocked.On("LinkSetVfTrust", fakeLink, netconf.VFID, false).Return(nil)
-			mocked.On("LinkSetVfRate", fakeLink, netconf.VFID, netconf.OrigVfState.MinTxRate,
-				netconf.OrigVfState.MaxTxRate).Return(nil)
-			mocked.On("LinkSetVfState", fakeLink, netconf.VFID, netconf.OrigVfState.LinkState).Return(nil)
 
 			m := manager{nLink: mocked}
 			err = m.ResetVFConfig(netconf)
@@ -319,6 +296,7 @@ var _ = Describe("Manager", func() {
 				Representor: "dummylink",
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
+				Vlan:        100,
 				VFID:        0,
 			}
 			// Mute logger
@@ -342,6 +320,7 @@ var _ = Describe("Manager", func() {
 				bridge := args.Get(1).(netlink.Link)
 				link.Attrs().MasterIndex = bridge.Attrs().Index
 			}).Return(nil)
+			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(100), true, true, false, true).Return(nil)
 
 			m := manager{nLink: mockedNl, sriov: mockedSr}
 			err := m.AttachRepresentor(netconf)
