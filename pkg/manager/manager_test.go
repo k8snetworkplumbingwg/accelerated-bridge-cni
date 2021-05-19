@@ -332,6 +332,7 @@ var _ = Describe("Manager", func() {
 				link.Attrs().MasterIndex = bridge.Attrs().Index
 			}).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(100), true, true, false, true).Return(nil)
+			mockedNl.On("BridgeVlanDel", fakeLink, uint16(1), true, true, false, true).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakePF, uint16(100), false, false, false, true).Return(nil)
 			m := manager{nLink: mockedNl, sriov: mockedSr}
 			err := m.AddToBridge(netconf)

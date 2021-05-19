@@ -439,6 +439,9 @@ func (m *manager) addRepresentorToBridge(bridge netlink.Link, conf *types.NetCon
 		if err = m.nLink.BridgeVlanAdd(rep, uint16(conf.Vlan), true, true, false, true); err != nil {
 			return fmt.Errorf("failed to set VLAN for representor %s: %v", conf.Representor, err)
 		}
+		if err = m.nLink.BridgeVlanDel(rep, uint16(1), true, true, false, true); err != nil {
+			return fmt.Errorf("failed to remove default (1) VLAN for representor %s: %v", conf.Representor, err)
+		}
 	}
 
 	if err = m.nLink.LinkSetUp(rep); err != nil {
