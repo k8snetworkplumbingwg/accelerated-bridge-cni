@@ -129,12 +129,12 @@ func (s *MyLittleSriov) GetVfRepresentor(master string, vfid int) (string, error
 
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
-	SetupVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) (string, error)
-	ReleaseVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) error
-	ResetVFConfig(conf *types.NetConf) error
-	ApplyVFConfig(conf *types.NetConf) error
-	AttachRepresentor(conf *types.NetConf) error
-	DetachRepresentor(conf *types.NetConf) error
+	SetupVF(conf *types.PluginConf, podifName string, cid string, netns ns.NetNS) (string, error)
+	ReleaseVF(conf *types.PluginConf, podifName string, cid string, netns ns.NetNS) error
+	ResetVFConfig(conf *types.PluginConf) error
+	ApplyVFConfig(conf *types.PluginConf) error
+	AttachRepresentor(conf *types.PluginConf) error
+	DetachRepresentor(conf *types.PluginConf) error
 }
 
 type manager struct {
@@ -153,7 +153,7 @@ func NewManager() Manager {
 }
 
 // SetupVF sets up a VF in Pod netns
-func (m *manager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.NetNS) (string, error) {
+func (m *manager) SetupVF(conf *types.PluginConf, podifName, cid string, netns ns.NetNS) (string, error) {
 	linkName := conf.OrigVfState.HostIFName
 
 	linkObj, err := m.nLink.LinkByName(linkName)
@@ -217,7 +217,7 @@ func (m *manager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.N
 }
 
 // ReleaseVF reset a VF from Pod netns and return it to init netns
-func (m *manager) ReleaseVF(conf *types.NetConf, podifName, cid string, netns ns.NetNS) error {
+func (m *manager) ReleaseVF(conf *types.PluginConf, podifName, cid string, netns ns.NetNS) error {
 	initns, err := ns.GetCurrentNS()
 	if err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
@@ -282,11 +282,11 @@ func getVfInfo(link netlink.Link, id int) *netlink.VfInfo {
 	return nil
 }
 
-// ApplyVFConfig configure a VF with parameters given in NetConf
-func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
-	pfLink, err := m.nLink.LinkByName(conf.Master)
+// ApplyVFConfig configure a VF with parameters given in PluginConf
+func (m *manager) ApplyVFConfig(conf *types.PluginConf) error {
+	pfLink, err := m.nLink.LinkByName(conf.PFName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
+		return fmt.Errorf("failed to lookup master %q: %v", conf.PFName, err)
 	}
 
 	// Save current the VF state before modifying it
@@ -312,10 +312,10 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 }
 
 // ResetVFConfig reset a VF to its original state
-func (m *manager) ResetVFConfig(conf *types.NetConf) error {
-	pfLink, err := m.nLink.LinkByName(conf.Master)
+func (m *manager) ResetVFConfig(conf *types.PluginConf) error {
+	pfLink, err := m.nLink.LinkByName(conf.PFName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
+		return fmt.Errorf("failed to lookup master %q: %v", conf.PFName, err)
 	}
 
 	// Restore the original administrative MAC address
@@ -334,15 +334,15 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 	return nil
 }
 
-func (m *manager) AttachRepresentor(conf *types.NetConf) error {
+func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 	bridge, err := m.nLink.LinkByName(conf.Bridge)
 	if err != nil {
 		return fmt.Errorf("failed to get bridge link %s: %v", conf.Bridge, err)
 	}
 
-	conf.Representor, err = m.sriov.GetVfRepresentor(conf.Master, conf.VFID)
+	conf.Representor, err = m.sriov.GetVfRepresentor(conf.PFName, conf.VFID)
 	if err != nil {
-		return fmt.Errorf("failed to get VF's %d representor on NIC %s: %v", conf.VFID, conf.Master, err)
+		return fmt.Errorf("failed to get VF's %d representor on NIC %s: %v", conf.VFID, conf.PFName, err)
 	}
 
 	var rep netlink.Link
@@ -375,7 +375,7 @@ func (m *manager) AttachRepresentor(conf *types.NetConf) error {
 	return nil
 }
 
-func (m *manager) DetachRepresentor(conf *types.NetConf) error {
+func (m *manager) DetachRepresentor(conf *types.PluginConf) error {
 	rep, err := m.nLink.LinkByName(conf.Representor)
 	if err != nil {
 		return fmt.Errorf("failed to get representor %s link: %v", conf.Representor, err)

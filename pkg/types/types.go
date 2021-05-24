@@ -6,26 +6,43 @@ import (
 
 // VfState represents the state of the VF
 type VfState struct {
-	HostIFName   string
-	AdminMAC     string
-	EffectiveMAC string
-	Vlan         int
+	HostIFName   string `json:"host_if_name"`
+	AdminMAC     string `json:"admin_mac"`
+	EffectiveMAC string `json:"effective_mac"`
 }
 
-// NetConf extends types.NetConf for sriov-cni
+// NetConf extends types.NetConf for accelerated-bridge-cni
+// defines accelerated-bridge-cni public API
 type NetConf struct {
 	types.NetConf
-	Debug         bool    `json:"debug,omitempty"` // enables debug log level
-	OrigVfState   VfState // Stores the original VF state as it was prior to any operations done during cmdAdd flow
-	Master        string
-	MAC           string
-	Representor   string // VF's representor attached to the bridge; used during deletion
-	Bridge        string `json:"bridge,omitempty"` // bridge used to attach representor to it, default is "cni0"
-	Vlan          int    `json:"vlan"`
-	DeviceID      string `json:"deviceID"` // PCI address of a VF in valid sysfs format
-	VFID          int
-	ContIFNames   string // VF names after in the container; used during deletion
+	// enable debug logging
+	Debug bool `json:"debug,omitempty"`
+	// bridge used to attach representor to it, default is "cni0"
+	Bridge string `json:"bridge,omitempty"`
+	// VLAN ID for VF
+	Vlan int `json:"vlan,omitempty"`
+	// MAC as top level config option; required for CNIs that don't support runtimeConfig
+	MAC string `json:"mac,omitempty"`
+	// PCI address of a VF in valid sysfs format
+	DeviceID      string `json:"deviceID"`
 	RuntimeConfig struct {
 		Mac string `json:"mac,omitempty"`
 	} `json:"runtimeConfig,omitempty"`
+}
+
+// PluginConf is a internal representation of config options and state
+type PluginConf struct {
+	NetConf
+	// Stores the original VF state as it was prior to any operations done during cmdAdd flow
+	OrigVfState VfState `json:"orig_vf_state"`
+	// Name of the PF to which VF belongs
+	PFName string `json:"pf_name"`
+	// MAC which should be set for VF
+	MAC string `json:"mac"`
+	// VF's representor attached to the bridge; used during deletion
+	Representor string `json:"representor"`
+	// VF index
+	VFID int `json:"vfid"`
+	// VF names after in the container; used during deletion
+	ContIFNames string `json:"cont_if_names"`
 }

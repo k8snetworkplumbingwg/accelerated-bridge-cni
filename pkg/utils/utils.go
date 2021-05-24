@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -156,19 +155,14 @@ func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
 	return names, nil
 }
 
-// SaveNetConf takes in container ID, data dir and Pod interface name as string and a json encoded struct Conf
+// SaveNetConf takes in container ID, data dir and Pod interface name as string and Conf as []byte
 // and save this Conf in data dir
-func SaveNetConf(cid, dataDir, podIfName string, conf interface{}) error {
-	netConfBytes, err := json.Marshal(conf)
-	if err != nil {
-		return fmt.Errorf("error serializing delegate netconf: %v", err)
-	}
-
+func SaveNetConf(cid, dataDir, podIfName string, conf []byte) error {
 	s := []string{cid, podIfName}
 	cRef := strings.Join(s, "-")
 
 	// save the rendered netconf for cmdDel
-	if err := saveScratchNetConf(cRef, dataDir, netConfBytes); err != nil {
+	if err := saveScratchNetConf(cRef, dataDir, conf); err != nil {
 		return err
 	}
 

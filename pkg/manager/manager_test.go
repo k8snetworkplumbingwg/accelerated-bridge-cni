@@ -76,15 +76,17 @@ var _ = Describe("Manager", func() {
 		var (
 			podifName string
 			contID    string
-			netconf   *types.NetConf
+			netconf   *types.PluginConf
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
 			contID = "dummycid"
-			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
+			netconf = &types.PluginConf{
+				NetConf: types.NetConf{
+					DeviceID: "0000:af:06.0",
+				},
+				PFName:      "enp175s0f1",
 				VFID:        0,
 				ContIFNames: "net1",
 				OrigVfState: types.VfState{
@@ -151,15 +153,17 @@ var _ = Describe("Manager", func() {
 		var (
 			podifName string
 			contID    string
-			netconf   *types.NetConf
+			netconf   *types.PluginConf
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
 			contID = "dummycid"
-			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
+			netconf = &types.PluginConf{
+				NetConf: types.NetConf{
+					DeviceID: "0000:af:06.0",
+				},
+				PFName:      "enp175s0f1",
 				VFID:        0,
 				ContIFNames: "net1",
 				OrigVfState: types.VfState{
@@ -186,15 +190,17 @@ var _ = Describe("Manager", func() {
 		var (
 			podifName string
 			contID    string
-			netconf   *types.NetConf
+			netconf   *types.PluginConf
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
 			contID = "dummycid"
-			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
+			netconf = &types.PluginConf{
+				NetConf: types.NetConf{
+					DeviceID: "0000:af:06.0",
+				},
+				PFName:      "enp175s0f1",
 				VFID:        0,
 				MAC:         "aa:f3:8d:65:1b:d4",
 				ContIFNames: "net1",
@@ -224,13 +230,15 @@ var _ = Describe("Manager", func() {
 	})
 	Context("Checking ResetVFConfig function - restore config no user params", func() {
 		var (
-			netconf *types.NetConf
+			netconf *types.PluginConf
 		)
 
 		BeforeEach(func() {
-			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
+			netconf = &types.PluginConf{
+				NetConf: types.NetConf{
+					DeviceID: "0000:af:06.0",
+				},
+				PFName:      "enp175s0f1",
 				VFID:        0,
 				ContIFNames: "net1",
 				OrigVfState: types.VfState{
@@ -242,7 +250,7 @@ var _ = Describe("Manager", func() {
 			mocked := &mocks.NetlinkManager{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
-			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			mocked.On("LinkByName", netconf.PFName).Return(fakeLink, nil)
 			m := manager{nLink: mocked}
 			err := m.ResetVFConfig(netconf)
 			Expect(err).NotTo(HaveOccurred())
@@ -252,22 +260,23 @@ var _ = Describe("Manager", func() {
 
 	Context("Checking ResetVFConfig function - restore config with user params", func() {
 		var (
-			netconf *types.NetConf
+			netconf *types.PluginConf
 		)
 
 		BeforeEach(func() {
-			netconf = &types.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
+			netconf = &types.PluginConf{
+				NetConf: types.NetConf{
+					DeviceID: "0000:af:06.0",
+					Vlan:     6,
+				},
+				PFName:      "enp175s0f1",
 				VFID:        3,
 				ContIFNames: "net1",
 				MAC:         "d2:fc:22:a7:0d:e8",
-				Vlan:        6,
 				OrigVfState: types.VfState{
 					HostIFName:   "enp175s6",
 					AdminMAC:     "aa:f3:8d:65:1b:d4",
 					EffectiveMAC: "aa:f3:8d:65:1b:d4",
-					Vlan:         1,
 				},
 			}
 		})
@@ -275,7 +284,7 @@ var _ = Describe("Manager", func() {
 			mocked := &mocks.NetlinkManager{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
-			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			mocked.On("LinkByName", netconf.PFName).Return(fakeLink, nil)
 			origMac, err := net.ParseMAC(netconf.OrigVfState.AdminMAC)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, origMac).Return(nil)
@@ -288,15 +297,17 @@ var _ = Describe("Manager", func() {
 	})
 	Context("Checking AttachRepresentor function", func() {
 		var (
-			netconf *types.NetConf
+			netconf *types.PluginConf
 		)
 
 		BeforeEach(func() {
-			netconf = &types.NetConf{
+			netconf = &types.PluginConf{
+				NetConf: types.NetConf{
+					DeviceID: "0000:af:06.0",
+					Vlan:     100,
+				},
 				Representor: "dummylink",
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				Vlan:        100,
+				PFName:      "enp175s0f1",
 				VFID:        0,
 			}
 			// Mute logger
@@ -313,7 +324,7 @@ var _ = Describe("Manager", func() {
 
 			mockedNl.On("LinkByName", netconf.Bridge).Return(fakeBridge, nil)
 			mockedNl.On("LinkByName", netconf.Representor).Return(fakeLink, nil)
-			mockedSr.On("GetVfRepresentor", netconf.Master, netconf.VFID).Return(fakeLink.Name, nil)
+			mockedSr.On("GetVfRepresentor", netconf.PFName, netconf.VFID).Return(fakeLink.Name, nil)
 			mockedNl.On("LinkSetUp", fakeLink).Return(nil)
 			mockedNl.On("LinkSetMaster", fakeLink, fakeBridge).Run(func(args mock.Arguments) {
 				link := args.Get(0).(netlink.Link)
@@ -340,7 +351,7 @@ var _ = Describe("Manager", func() {
 
 			mockedNl.On("LinkByName", netconf.Bridge).Return(fakeBridge, nil)
 			mockedNl.On("LinkByName", netconf.Representor).Return(fakeLink, nil)
-			mockedSr.On("GetVfRepresentor", netconf.Master, netconf.VFID).Return(fakeLink.Name, nil)
+			mockedSr.On("GetVfRepresentor", netconf.PFName, netconf.VFID).Return(fakeLink.Name, nil)
 			mockedNl.On("LinkSetUp", fakeLink).Return(nil)
 			mockedNl.On("LinkSetMaster", fakeLink, fakeBridge).Return(errors.New("some error"))
 
@@ -353,14 +364,16 @@ var _ = Describe("Manager", func() {
 	})
 	Context("Checking DetachRepresentor function", func() {
 		var (
-			netconf *types.NetConf
+			netconf *types.PluginConf
 		)
 
 		BeforeEach(func() {
-			netconf = &types.NetConf{
+			netconf = &types.PluginConf{
+				NetConf: types.NetConf{
+					DeviceID: "0000:af:06.0",
+				},
 				Representor: "dummylink",
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
+				PFName:      "enp175s0f1",
 				VFID:        0,
 			}
 			// Mute logger
