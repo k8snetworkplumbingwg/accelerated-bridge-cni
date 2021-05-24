@@ -60,6 +60,14 @@ func LoadConf(bytes []byte) (*localtypes.PluginConf, error) {
 		return nil, fmt.Errorf("vlan id %d invalid: value must be in the range 0-4094", conf.Vlan)
 	}
 
+	// validate trunk settings
+	if len(conf.NetConf.Trunk) > 0 {
+		conf.Trunk, err = splitVlanIds(conf.NetConf.Trunk)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return conf, nil
 }
 

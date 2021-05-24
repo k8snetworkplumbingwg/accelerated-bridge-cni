@@ -309,6 +309,7 @@ var _ = Describe("Manager", func() {
 				Representor: "dummylink",
 				PFName:      "enp175s0f1",
 				VFID:        0,
+				Trunk:       []int{4, 6},
 			}
 			// Mute logger
 			zerolog.SetGlobalLevel(zerolog.Disabled)
@@ -331,7 +332,10 @@ var _ = Describe("Manager", func() {
 				bridge := args.Get(1).(netlink.Link)
 				link.Attrs().MasterIndex = bridge.Attrs().Index
 			}).Return(nil)
+			mockedNl.On("BridgeVlanDel", fakeLink, uint16(1), true, true, false, true).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(100), true, true, false, true).Return(nil)
+			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(4), false, false, false, true).Return(nil)
+			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(6), false, false, false, true).Return(nil)
 
 			m := manager{nLink: mockedNl, sriov: mockedSr}
 			err := m.AttachRepresentor(netconf)

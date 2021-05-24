@@ -94,6 +94,29 @@ func (n *MyNetlink) BridgeVlanDel(link netlink.Link, vid uint16, pvid, untagged,
 	return netlink.BridgeVlanDel(link, vid, pvid, untagged, self, master)
 }
 
+// configure port VLAN id for link
+func bridgePVIDVlanAdd(nlink NetlinkManager, link netlink.Link, vlanID int) error {
+	// pvid, egress untagged
+	return nlink.BridgeVlanAdd(link, uint16(vlanID), true, true, false, true)
+}
+
+// remove port VLAN id for link
+func bridgePVIDVlanDel(nlink NetlinkManager, link netlink.Link, vlanID int) error {
+	// pvid, egress untagged
+	return nlink.BridgeVlanDel(link, uint16(vlanID), true, true, false, true)
+}
+
+// configure vlan trunk on link
+func bridgeTrunkVlanAdd(nlink NetlinkManager, link netlink.Link, vlans []int) error {
+	// egress tagged
+	for _, vlanID := range vlans {
+		if err := nlink.BridgeVlanAdd(link, uint16(vlanID), false, false, false, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type pciUtils interface {
 	getSriovNumVfs(ifName string) (int, error)
 	getVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error)
@@ -366,8 +389,22 @@ func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 		}
 	}()
 
-	if conf.Vlan != 0 {
-		if err = m.nLink.BridgeVlanAdd(rep, uint16(conf.Vlan), true, true, false, true); err != nil {
+	// if VF has any VLAN config we should remove default vlan on port
+	// if VLAN 1 explicitly requested we should not remove it from the port
+	if conf.Vlan > 1 || len(conf.Trunk) > 0 {
+		if err = bridgePVIDVlanDel(m.nLink, rep, 1); err != nil {
+			return fmt.Errorf("failed to remove default VLAN(1) for representor %s: %v", conf.Representor, err)
+		}
+	}
+
+	if len(conf.Trunk) > 0 {
+		if err = bridgeTrunkVlanAdd(m.nLink, rep, conf.Trunk); err != nil {
+			return fmt.Errorf("failed to add trunk VLAN for representor %s: %v", conf.Representor, err)
+		}
+	}
+
+	if conf.Vlan > 0 {
+		if err = bridgePVIDVlanAdd(m.nLink, rep, conf.Vlan); err != nil {
 			return fmt.Errorf("failed to set VLAN for representor %s: %v", conf.Representor, err)
 		}
 	}
