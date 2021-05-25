@@ -23,18 +23,12 @@ const (
 // NetlinkManager is an interface to mock netlink library
 type NetlinkManager interface {
 	LinkByName(string) (netlink.Link, error)
-	LinkSetVfVlan(netlink.Link, int, int) error
-	LinkSetVfVlanQos(netlink.Link, int, int, int) error
 	LinkSetVfHardwareAddr(netlink.Link, int, net.HardwareAddr) error
 	LinkSetHardwareAddr(netlink.Link, net.HardwareAddr) error
 	LinkSetUp(netlink.Link) error
 	LinkSetDown(netlink.Link) error
 	LinkSetNsFd(netlink.Link, int) error
 	LinkSetName(netlink.Link, string) error
-	LinkSetVfRate(netlink.Link, int, int, int) error
-	LinkSetVfSpoofchk(netlink.Link, int, bool) error
-	LinkSetVfTrust(netlink.Link, int, bool) error
-	LinkSetVfState(netlink.Link, int, uint32) error
 	LinkSetMaster(netlink.Link, netlink.Link) error
 	LinkSetNoMaster(netlink.Link) error
 	BridgeVlanAdd(netlink.Link, uint16, bool, bool, bool, bool) error
@@ -48,16 +42,6 @@ type MyNetlink struct {
 // LinkByName implements NetlinkManager
 func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
 	return netlink.LinkByName(name)
-}
-
-// LinkSetVfVlan using NetlinkManager
-func (n *MyNetlink) LinkSetVfVlan(link netlink.Link, vf, vlan int) error {
-	return netlink.LinkSetVfVlan(link, vf, vlan)
-}
-
-// LinkSetVfVlanQos sets VLAN ID and QoS field for given VF using NetlinkManager
-func (n *MyNetlink) LinkSetVfVlanQos(link netlink.Link, vf, vlan, qos int) error {
-	return netlink.LinkSetVfVlanQos(link, vf, vlan, qos)
 }
 
 // LinkSetVfHardwareAddr using NetlinkManager
@@ -88,26 +72,6 @@ func (n *MyNetlink) LinkSetNsFd(link netlink.Link, fd int) error {
 // LinkSetName using NetlinkManager
 func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
 	return netlink.LinkSetName(link, name)
-}
-
-// LinkSetVfRate using NetlinkManager
-func (n *MyNetlink) LinkSetVfRate(link netlink.Link, vf, minRate, maxRate int) error {
-	return netlink.LinkSetVfRate(link, vf, minRate, maxRate)
-}
-
-// LinkSetVfSpoofchk using NetlinkManager
-func (n *MyNetlink) LinkSetVfSpoofchk(link netlink.Link, vf int, check bool) error {
-	return netlink.LinkSetVfSpoofchk(link, vf, check)
-}
-
-// LinkSetVfTrust using NetlinkManager
-func (n *MyNetlink) LinkSetVfTrust(link netlink.Link, vf int, state bool) error {
-	return netlink.LinkSetVfTrust(link, vf, state)
-}
-
-// LinkSetVfState using NetlinkManager
-func (n *MyNetlink) LinkSetVfState(link netlink.Link, vf int, state uint32) error {
-	return netlink.LinkSetVfState(link, vf, state)
 }
 
 // LinkSetMaster using NetlinkManager
@@ -165,12 +129,12 @@ func (s *MyLittleSriov) GetVfRepresentor(master string, vfid int) (string, error
 
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
-	SetupVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) (string, error)
-	ReleaseVF(conf *types.NetConf, podifName string, cid string, netns ns.NetNS) error
-	ResetVFConfig(conf *types.NetConf) error
-	ApplyVFConfig(conf *types.NetConf) error
-	AttachRepresentor(conf *types.NetConf) error
-	DetachRepresentor(conf *types.NetConf) error
+	SetupVF(conf *types.PluginConf, podifName string, cid string, netns ns.NetNS) (string, error)
+	ReleaseVF(conf *types.PluginConf, podifName string, cid string, netns ns.NetNS) error
+	ResetVFConfig(conf *types.PluginConf) error
+	ApplyVFConfig(conf *types.PluginConf) error
+	AttachRepresentor(conf *types.PluginConf) error
+	DetachRepresentor(conf *types.PluginConf) error
 }
 
 type manager struct {
@@ -189,7 +153,7 @@ func NewManager() Manager {
 }
 
 // SetupVF sets up a VF in Pod netns
-func (m *manager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.NetNS) (string, error) {
+func (m *manager) SetupVF(conf *types.PluginConf, podifName, cid string, netns ns.NetNS) (string, error) {
 	linkName := conf.OrigVfState.HostIFName
 
 	linkObj, err := m.nLink.LinkByName(linkName)
@@ -253,7 +217,7 @@ func (m *manager) SetupVF(conf *types.NetConf, podifName, cid string, netns ns.N
 }
 
 // ReleaseVF reset a VF from Pod netns and return it to init netns
-func (m *manager) ReleaseVF(conf *types.NetConf, podifName, cid string, netns ns.NetNS) error {
+func (m *manager) ReleaseVF(conf *types.PluginConf, podifName, cid string, netns ns.NetNS) error {
 	initns, err := ns.GetCurrentNS()
 	if err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
@@ -318,11 +282,11 @@ func getVfInfo(link netlink.Link, id int) *netlink.VfInfo {
 	return nil
 }
 
-// ApplyVFConfig configure a VF with parameters given in NetConf
-func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
-	pfLink, err := m.nLink.LinkByName(conf.Master)
+// ApplyVFConfig configure a VF with parameters given in PluginConf
+func (m *manager) ApplyVFConfig(conf *types.PluginConf) error {
+	pfLink, err := m.nLink.LinkByName(conf.PFName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
+		return fmt.Errorf("failed to lookup master %q: %v", conf.PFName, err)
 	}
 
 	// Save current the VF state before modifying it
@@ -348,10 +312,10 @@ func (m *manager) ApplyVFConfig(conf *types.NetConf) error {
 }
 
 // ResetVFConfig reset a VF to its original state
-func (m *manager) ResetVFConfig(conf *types.NetConf) error {
-	pfLink, err := m.nLink.LinkByName(conf.Master)
+func (m *manager) ResetVFConfig(conf *types.PluginConf) error {
+	pfLink, err := m.nLink.LinkByName(conf.PFName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
+		return fmt.Errorf("failed to lookup master %q: %v", conf.PFName, err)
 	}
 
 	// Restore the original administrative MAC address
@@ -370,15 +334,15 @@ func (m *manager) ResetVFConfig(conf *types.NetConf) error {
 	return nil
 }
 
-func (m *manager) AttachRepresentor(conf *types.NetConf) error {
+func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 	bridge, err := m.nLink.LinkByName(conf.Bridge)
 	if err != nil {
 		return fmt.Errorf("failed to get bridge link %s: %v", conf.Bridge, err)
 	}
 
-	conf.Representor, err = m.sriov.GetVfRepresentor(conf.Master, conf.VFID)
+	conf.Representor, err = m.sriov.GetVfRepresentor(conf.PFName, conf.VFID)
 	if err != nil {
-		return fmt.Errorf("failed to get VF's %d representor on NIC %s: %v", conf.VFID, conf.Master, err)
+		return fmt.Errorf("failed to get VF's %d representor on NIC %s: %v", conf.VFID, conf.PFName, err)
 	}
 
 	var rep netlink.Link
@@ -411,7 +375,7 @@ func (m *manager) AttachRepresentor(conf *types.NetConf) error {
 	return nil
 }
 
-func (m *manager) DetachRepresentor(conf *types.NetConf) error {
+func (m *manager) DetachRepresentor(conf *types.PluginConf) error {
 	rep, err := m.nLink.LinkByName(conf.Representor)
 	if err != nil {
 		return fmt.Errorf("failed to get representor %s link: %v", conf.Representor, err)

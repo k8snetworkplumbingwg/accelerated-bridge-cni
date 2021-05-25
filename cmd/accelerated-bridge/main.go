@@ -123,7 +123,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}()
 	if err != nil {
 		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v",
-			args.IfName, netConf.Master, err)
+			args.IfName, netConf.PFName, err)
 	}
 
 	// run the IPAM plugin
@@ -131,7 +131,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		var r types.Result
 		if r, err = ipam.ExecAdd(netConf.IPAM.Type, args.StdinData); err != nil {
 			return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v",
-				netConf.IPAM.Type, netConf.Master, err)
+				netConf.IPAM.Type, netConf.PFName, err)
 		}
 
 		defer func() {
@@ -167,9 +167,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 		result = newResult
 	}
 
-	// Cache NetConf for CmdDel
-	if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
-		return fmt.Errorf("error saving NetConf %q", err)
+	// Cache PluginConf for CmdDel
+	if err = config.SaveConf(netConf, args); err != nil {
+		return fmt.Errorf("failed to save PluginConf %q", err)
 	}
 
 	return types.PrintResult(result, current.ImplementedSpecVersion)
