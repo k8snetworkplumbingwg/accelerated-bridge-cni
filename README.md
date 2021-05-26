@@ -6,18 +6,26 @@
       * [Usage](#usage)
          * [Basic configuration parameters](#basic-configuration-parameters)
          * [Example configurations](#example-configurations)
-            * [Kernel driver config](#kernel-driver-config)
-            * [Advanced kernel driver config](#advanced-kernel-driver-config)
-            * [DPDK userspace driver config](#dpdk-userspace-driver-config)
+            * [Basic config](#basic-config)
+            * [Extended config](#extended-config)
          * [Advanced configuration](#advanced-configuration)
       * [Contributing](#contributing)
 
 # Accelerated Bridge CNI plugin
-This plugin enables the configuration and usage of Accelerated Bridge VF networks in containers and orchestrators like Kubernetes.
+This plugin allows using Linux Bridge with hardware offloading in containers and orchestrators like Kubernetes.
+Accelerated Bridge CNI plugin requires NIC with support of SR-IOV
+technology with VFs in switchdev mode and support of Linux Bridge offloading.
 
-Network Interface Cards (NICs) with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities are managed through physical functions (PFs) and virtual functions (VFs). A PF is used by the host and usually represents a single NIC port. VF configurations are applied through the PF. With Accelerated Bridge CNI each VF can be treated as a separate network interface, assigned to a container, and configured with it's own MAC, VLAN IP and more.
+In switchdev mode, two net-devs exist for VF net-device and VF representor.
+A packet sent through the VF representor on the host arrives to the VF, and a packet sent through the VF is received by its representor.
+CNI plugin moves VF net-device to a container network namespace and attaches VF representor to a Linux Bridge on a host.
+Then additional Bridge port settings, such as VLANs configuration, can be applied for VF representor.
 
-Accelerated Bridge CNI plugin works with [SR-IOV device plugin](https://github.com/intel/sriov-network-device-plugin) for VF allocation in Kubernetes. A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allocated VF's `deviceID`(PCI address) and is responsible for invoking the Accelerated Bridge CNI plugin with that `deviceID`.
+This plugin works with [SR-IOV device plugin](https://github.com/intel/sriov-network-device-plugin) for VF allocation in Kubernetes.
+
+A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allocated VF's `deviceID`(PCI address) and is responsible for invoking the Accelerated Bridge CNI plugin with that `deviceID`.
+
+Accelerated Bridge plugin assumes that Linux Bridge is already exist and correctly configured on nodes.
 
 ## Build
 
@@ -32,15 +40,13 @@ make
 Upon successful build the plugin binary will be available in `build/accelerated-bridge`.
 
 ## Kubernetes Quick Start
-A full guide on orchestrating Accelerated Bridge virtual functions in Kubernetes can be found at the [Accelerated Bridge Device Plugin project.](https://github.com/intel/sriov-network-device-plugin#quick-start)
+A full guide on orchestrating SR-IOV virtual functions in Kubernetes can be found at the [SR-IOV Network Device Plugin project.](https://github.com/intel/sriov-network-device-plugin#quick-start)
 
 Creating VFs is outside the scope of the Accelerated Bridge CNI plugin. [More information about allocating VFs on different NICs can be found here](https://github.com/intel/sriov-network-device-plugin/blob/master/docs/vf-setup.md)
 
 To deploy Accelerated Bridge CNI by itself on a Kubernetes 1.16+ cluster:
 
 `kubectl apply -f images/k8s-v1.16/accelerated-bridge-cni-daemonset.yaml`
-
-**Note** The above deployment is not sufficient to manage and configure Accelerated Bridge virtual functions. [See the full orchestration guide for more information.](https://github.com/intel/sriov-network-device-plugin#sr-iov-network-device-plugin)
 
 
 ## Usage
@@ -85,8 +91,8 @@ The following parameters are generic parameters which are not specific to the Ac
 ### Example configurations
 The following examples show the config needed to set up basic Accelerated Bridge networking in a container. Each of the json config objects below can be placed in the `.spec.config` field of a Network Attachment Definition to integrate with Multus.
 
-#### Kernel driver config
-This is the minimum configuration for a working kernel driver interface using an Accelerated Bridge Virtual Function. It applies an IP address using the host-local IPAM plugin in the range of the subnet provided.
+#### Basic config
+This is the minimum configuration for Accelerated Bridge CNI. It applies an IP address using the host-local IPAM plugin in the range of the subnet provided.
 
 ```json
 {
@@ -103,8 +109,9 @@ This is the minimum configuration for a working kernel driver interface using an
   }
 }
 ```
+_Note: by default Accelerated Bridge CNI will use Linux Bridge with name `cni0`_
 
-#### Extended kernel driver config
+#### Extended config
 This configuration sets a number of extra parameters that may be key for Accelerated Bridge networks including a vlan tag, disabled spoof checking and enabled trust mode. These parameters are commonly set in more advanced Accelerated Bridge VF based networks.
 
 ```json
@@ -113,6 +120,7 @@ This configuration sets a number of extra parameters that may be key for Acceler
   "name": "some-net-advanced",
   "type": "accelerated-bridge",
   "vlan": 1000,
+  "bridge": "br1",
   "ipam": {
     "type": "host-local",
     "subnet": "10.56.217.0/24",
