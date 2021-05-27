@@ -10,6 +10,24 @@ The Accelerated Bridge CNI configures networks through a CNI spec configuration 
 * `deviceID` (string, required): A valid pci address of a SWITCHDEV NIC's VF. e.g. "0000:03:02.3".
 * `vlan` (int, optional): VLAN ID to assign for the VF. Value must be in the range 0-4094 (0 for disabled, 1-4094 for valid VLAN IDs).
 * `mac` (string, optional): MAC address to assign for the VF
+* `trunk` (array, optional): VLAN trunk configuration for the VF. 
+  Value must be an array of objects with trunk config, e.g.
+  `[{"id": 42}, {"minID": 100, "maxID": 105}, {"minID": 200, "maxID": 210]`,
+  which means that trunk will allow folowing VLANs 42,100-105,200-210
+
+Default VLAN (1) will be used for VF if `vlan` and `trunk` options are not configured.
+In this case bridge expect untagged frames from VF and will drop all tagged frames.
+
+
+It is also possible to use `vlan` and `trunk` options together. 
+In this case, VLAN ID from `vlan` option will be used as
+"native" VLAN for VF. This means that bridge will add tag from `vlan` option to
+all untagged frames from VF and allow VF to send tagged frames with tags from `trunk` option.
+
+
+_Note: Accelerated Bridge CNI manages VLANs configuration for VF representor ports only.
+Which VLAN tag will be used when packet sent to wire also depends on Linux Bridge configuration (e.g. vlan_filtering option)
+and VLAN configuration for PF. CNI plugin doesn't manage these settings._
 
 
 An Accelerated Bridge CNI config with each field filled out looks like:
@@ -20,8 +38,9 @@ An Accelerated Bridge CNI config with each field filled out looks like:
     "name": "some-net",
     "type": "accelerated-bridge",
     "deviceID": "0000:03:02.0",
+    "mac": "CA:FE:C0:FF:EE:00",
     "vlan": 1000,
-    "mac": "CA:FE:C0:FF:EE:00"
+    "trunk": [{"minID": 100, "maxID": 105}]
 }
 ```
 
