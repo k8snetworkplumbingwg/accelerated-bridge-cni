@@ -20,7 +20,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/Mellanox/accelerated-bridge-cni/pkg/types"
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 )
 
 func splitVlanIds(trunks []types.Trunk) ([]int, error) {

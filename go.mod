@@ -1,4 +1,4 @@
-module github.com/Mellanox/accelerated-bridge-cni
+module github.com/k8snetworkplumbingwg/accelerated-bridge-cni
 
 go 1.13
 

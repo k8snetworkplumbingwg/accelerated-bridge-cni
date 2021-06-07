@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/mellanox/accelerated-bridge-cni.svg?branch=master)](https://travis-ci.org/mellanox/accelerated-bridge-cni) [![Go Report Card](https://goreportcard.com/badge/github.com/mellanox/accelerated-bridge-cni)](https://goreportcard.com/report/github.com/mellanox/accelerated-bridge-cni)
+[![Build Status](https://travis-ci.org/k8snetworkplumbingwg/accelerated-bridge-cni.svg?branch=master)](https://travis-ci.org/k8snetworkplumbingwg/accelerated-bridge-cni) [![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/accelerated-bridge-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/accelerated-bridge-cni)
 
    * [Accelerated Bridge CNI plugin](#accelerated-bridge-cni-plugin)
       * [Build](#build)

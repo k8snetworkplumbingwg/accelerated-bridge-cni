@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/Mellanox/accelerated-bridge-cni/pkg/utils"
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
 )
 
 func check(e error) {

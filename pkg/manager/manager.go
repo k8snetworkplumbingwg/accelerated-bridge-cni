@@ -9,8 +9,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
 
-	"github.com/Mellanox/accelerated-bridge-cni/pkg/types"
-	"github.com/Mellanox/accelerated-bridge-cni/pkg/utils"
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
 )
 
 const (
