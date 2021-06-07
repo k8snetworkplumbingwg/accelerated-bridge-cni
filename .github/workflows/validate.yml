@@ -1,0 +1,35 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  validate:
+    name: validate code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.15
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: lint
+        run: make lint
+      - name: build
+        run: make build
+      - name: test
+        run: make test
+  image:
+    name: build image
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: image
+        run: make image
