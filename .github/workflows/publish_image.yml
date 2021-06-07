@@ -1,0 +1,19 @@
+name: PublishImage
+
+on:
+  workflow_run:
+    workflows: [ "Validate" ]
+    branches:
+      - master
+    types:
+      - completed
+jobs:
+  on-success:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
