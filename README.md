@@ -1,4 +1,6 @@
-[![Build Status](https://travis-ci.org/k8snetworkplumbingwg/accelerated-bridge-cni.svg?branch=master)](https://travis-ci.org/k8snetworkplumbingwg/accelerated-bridge-cni) [![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/accelerated-bridge-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/accelerated-bridge-cni)
+[![Build](https://github.com/k8snetworkplumbingwg/accelerated-bridge-cni/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/k8snetworkplumbingwg/accelerated-bridge-cni/actions/workflows/build.yml)
+[![Publish image](https://github.com/k8snetworkplumbingwg/accelerated-bridge-cni/actions/workflows/image-push-master.yml/badge.svg?branch=master)](https://github.com/k8snetworkplumbingwg/accelerated-bridge-cni/actions/workflows/image-push-master.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/accelerated-bridge-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/accelerated-bridge-cni)
 
    * [Accelerated Bridge CNI plugin](#accelerated-bridge-cni-plugin)
       * [Build](#build)
