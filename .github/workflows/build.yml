@@ -5,6 +5,8 @@ jobs:
   validate:
     name: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Set up Go 1.x
         uses: actions/setup-go@v2
@@ -17,7 +19,11 @@ jobs:
       - name: build
         run: make build
       - name: test
-        run: make test
+        run: make test-coverage
+      - name: upload coverage report
+        env:
+          COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make upload-coverage
   image:
     name: image build
     runs-on: ubuntu-latest
