@@ -72,7 +72,7 @@ $(GOLANGCI_LINT): | $(BASE) ; $(info  building golangci-lint...)
 
 GOVERALLS = $(GOBIN)/goveralls
 $(GOBIN)/goveralls: | $(BASE) ; $(info  building goveralls...)
-	$Q go get github.com/mattn/goveralls
+	$Q env GO111MODULE=off go get github.com/mattn/goveralls
 
 
 # Tests
