@@ -4,126 +4,12 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Mellanox/sriovnet"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
 
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 )
-
-// mocked netlink interface
-// required for unit tests
-
-// NetlinkManager is an interface to mock netlink library
-type NetlinkManager interface {
-	LinkByName(string) (netlink.Link, error)
-	LinkSetVfHardwareAddr(netlink.Link, int, net.HardwareAddr) error
-	LinkSetHardwareAddr(netlink.Link, net.HardwareAddr) error
-	LinkSetUp(netlink.Link) error
-	LinkSetDown(netlink.Link) error
-	LinkSetNsFd(netlink.Link, int) error
-	LinkSetName(netlink.Link, string) error
-	LinkSetMaster(netlink.Link, netlink.Link) error
-	LinkSetNoMaster(netlink.Link) error
-	BridgeVlanAdd(netlink.Link, uint16, bool, bool, bool, bool) error
-	BridgeVlanDel(netlink.Link, uint16, bool, bool, bool, bool) error
-}
-
-// MyNetlink NetlinkManager
-type MyNetlink struct {
-}
-
-// LinkByName implements NetlinkManager
-func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
-	return netlink.LinkByName(name)
-}
-
-// LinkSetVfHardwareAddr using NetlinkManager
-func (n *MyNetlink) LinkSetVfHardwareAddr(link netlink.Link, vf int, hwaddr net.HardwareAddr) error {
-	return netlink.LinkSetVfHardwareAddr(link, vf, hwaddr)
-}
-
-// LinkSetHardwareAddr using NetlinkManager
-func (n *MyNetlink) LinkSetHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
-	return netlink.LinkSetHardwareAddr(link, hwaddr)
-}
-
-// LinkSetUp using NetlinkManager
-func (n *MyNetlink) LinkSetUp(link netlink.Link) error {
-	return netlink.LinkSetUp(link)
-}
-
-// LinkSetDown using NetlinkManager
-func (n *MyNetlink) LinkSetDown(link netlink.Link) error {
-	return netlink.LinkSetDown(link)
-}
-
-// LinkSetNsFd using NetlinkManager
-func (n *MyNetlink) LinkSetNsFd(link netlink.Link, fd int) error {
-	return netlink.LinkSetNsFd(link, fd)
-}
-
-// LinkSetName using NetlinkManager
-func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
-	return netlink.LinkSetName(link, name)
-}
-
-// LinkSetMaster using NetlinkManager
-func (n *MyNetlink) LinkSetMaster(link, master netlink.Link) error {
-	return netlink.LinkSetMaster(link, master)
-}
-
-// LinkSetNoMaster using NetlinkManager
-func (n *MyNetlink) LinkSetNoMaster(link netlink.Link) error {
-	return netlink.LinkSetNoMaster(link)
-}
-
-// BridgeVlanAdd using NetlinkManager
-func (n *MyNetlink) BridgeVlanAdd(link netlink.Link, vid uint16, pvid, untagged, self, master bool) error {
-	return netlink.BridgeVlanAdd(link, vid, pvid, untagged, self, master)
-}
-
-// BridgeVlanDel using NetlinkManager
-func (n *MyNetlink) BridgeVlanDel(link netlink.Link, vid uint16, pvid, untagged, self, master bool) error {
-	return netlink.BridgeVlanDel(link, vid, pvid, untagged, self, master)
-}
-
-// configure port VLAN id for link
-func bridgePVIDVlanAdd(nlink NetlinkManager, link netlink.Link, vlanID int) error {
-	// pvid, egress untagged
-	return nlink.BridgeVlanAdd(link, uint16(vlanID), true, true, false, true)
-}
-
-// remove port VLAN id for link
-func bridgePVIDVlanDel(nlink NetlinkManager, link netlink.Link, vlanID int) error {
-	// pvid, egress untagged
-	return nlink.BridgeVlanDel(link, uint16(vlanID), true, true, false, true)
-}
-
-// configure vlan trunk on link
-func bridgeTrunkVlanAdd(nlink NetlinkManager, link netlink.Link, vlans []int) error {
-	// egress tagged
-	for _, vlanID := range vlans {
-		if err := nlink.BridgeVlanAdd(link, uint16(vlanID), false, false, false, true); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// mocked sriovnet interface
-// required for unit tests
-
-type Sriovnet interface {
-	GetVfRepresentor(string, int) (string, error)
-}
-
-type MyLittleSriov struct{}
-
-func (s *MyLittleSriov) GetVfRepresentor(master string, vfid int) (string, error) {
-	return sriovnet.GetVfRepresentor(master, vfid)
-}
 
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
@@ -136,15 +22,15 @@ type Manager interface {
 }
 
 type manager struct {
-	nLink NetlinkManager
+	nLink Netlink
 	sriov Sriovnet
 }
 
 // NewManager returns an instance of manager
 func NewManager() Manager {
 	return &manager{
-		nLink: &MyNetlink{},
-		sriov: &MyLittleSriov{},
+		nLink: &netlinkWrapper{},
+		sriov: &sriovnetWrapper{},
 	}
 }
 
