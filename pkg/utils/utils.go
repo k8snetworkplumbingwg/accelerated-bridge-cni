@@ -89,28 +89,6 @@ func GetPfName(vf string) (string, error) {
 	return strings.TrimSpace(files[0].Name()), nil
 }
 
-// GetPciAddress takes in a interface(ifName) and VF id and returns returns its pci addr as string
-func GetPciAddress(ifName string, vf int) (string, error) {
-	var pciaddr string
-	vfDir := filepath.Join(NetDirectory, ifName, "device", fmt.Sprintf("virtfn%d", vf))
-	dirInfo, err := os.Lstat(vfDir)
-	if err != nil {
-		return pciaddr, fmt.Errorf("can't get the symbolic link of virtfn%d dir of the device %q: %v", vf, ifName, err)
-	}
-
-	if (dirInfo.Mode() & os.ModeSymlink) == 0 {
-		return pciaddr, fmt.Errorf("no symbolic link for the virtfn%d dir of the device %q", vf, ifName)
-	}
-
-	pciinfo, err := os.Readlink(vfDir)
-	if err != nil {
-		return pciaddr, fmt.Errorf("can't read the symbolic link of virtfn%d dir of the device %q: %v", vf, ifName, err)
-	}
-
-	pciaddr = filepath.Base(pciinfo)
-	return pciaddr, nil
-}
-
 // GetVFLinkName returns VF's network interface name given it's PCI addr
 func GetVFLinkName(pciAddr string) (string, error) {
 	vfDir := filepath.Join(SysBusPci, pciAddr, "net")
@@ -133,26 +111,6 @@ func GetVFLinkName(pciAddr string) (string, error) {
 	}
 
 	return names[0], nil
-}
-
-// GetVFLinkNamesFromVFID returns VF's network interface name given it's PF name as string and VF id as int
-func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
-	vfDir := filepath.Join(NetDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vfID), "net")
-	if _, err := os.Lstat(vfDir); err != nil {
-		return nil, err
-	}
-
-	fInfos, err := ioutil.ReadDir(vfDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vfID, pfName, err)
-	}
-
-	names := make([]string, 0, len(fInfos))
-	for _, f := range fInfos {
-		names = append(names, f.Name())
-	}
-
-	return names, nil
 }
 
 // SaveNetConf takes in container ID, data dir and Pod interface name as string and Conf as []byte

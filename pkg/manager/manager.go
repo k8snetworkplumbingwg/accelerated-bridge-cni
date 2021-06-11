@@ -10,11 +10,6 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
-	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
-)
-
-const (
-	ON = "on"
 )
 
 // mocked netlink interface
@@ -117,26 +112,6 @@ func bridgeTrunkVlanAdd(nlink NetlinkManager, link netlink.Link, vlans []int) er
 	return nil
 }
 
-type pciUtils interface {
-	getSriovNumVfs(ifName string) (int, error)
-	getVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error)
-	getPciAddress(ifName string, vf int) (string, error)
-}
-
-type pciUtilsImpl struct{}
-
-func (p *pciUtilsImpl) getSriovNumVfs(ifName string) (int, error) {
-	return utils.GetSriovNumVfs(ifName)
-}
-
-func (p *pciUtilsImpl) getVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
-	return utils.GetVFLinkNamesFromVFID(pfName, vfID)
-}
-
-func (p *pciUtilsImpl) getPciAddress(ifName string, vf int) (string, error) {
-	return utils.GetPciAddress(ifName, vf)
-}
-
 // mocked sriovnet interface
 // required for unit tests
 
@@ -162,7 +137,6 @@ type Manager interface {
 
 type manager struct {
 	nLink NetlinkManager
-	utils pciUtils
 	sriov Sriovnet
 }
 
@@ -170,7 +144,6 @@ type manager struct {
 func NewManager() Manager {
 	return &manager{
 		nLink: &MyNetlink{},
-		utils: &pciUtilsImpl{},
 		sriov: &MyLittleSriov{},
 	}
 }
