@@ -41,30 +41,4 @@ var _ = Describe("Utils", func() {
 			Expect(err).To(HaveOccurred(), "Not existing VF should return an error")
 		})
 	})
-	Context("Checking GetPciAddress function", func() {
-		It("Assuming existing interface and vf", func() {
-			Expect(GetPciAddress("enp175s0f1", 0)).To(Equal("0000:af:06.0"),
-				"Existing PF and VF id should return correct VF pci address")
-		})
-		It("Assuming not existing interface", func() {
-			_, err := GetPciAddress("enp175s0f2", 0)
-			Expect(err).To(HaveOccurred(), "Not existing PF should return an error")
-		})
-		It("Assuming not existing vf", func() {
-			result, err := GetPciAddress("enp175s0f1", 33)
-			Expect(result).To(Equal(""), "Not existing VF id should not return pci address")
-			Expect(err).To(HaveOccurred(), "Not existing VF id should return an error")
-		})
-	})
-	Context("Checking GetVFLinkNames function", func() {
-		It("Assuming existing vf", func() {
-			result, err := GetVFLinkNamesFromVFID("enp175s0f1", 0)
-			Expect(result).To(ContainElement("enp175s6"), "Existing PF should have at least one VF")
-			Expect(err).NotTo(HaveOccurred(), "Existing PF should not return an error")
-		})
-		It("Assuming not existing vf", func() {
-			_, err := GetVFLinkNamesFromVFID("enp175s0f1", 3)
-			Expect(err).To(HaveOccurred(), "Not existing VF should return an error")
-		})
-	})
 })
