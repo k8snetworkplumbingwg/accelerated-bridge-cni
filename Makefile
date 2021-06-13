@@ -72,7 +72,7 @@ $(GOLANGCI_LINT): | $(BASE) ; $(info  building golangci-lint...)
 
 GOVERALLS = $(GOBIN)/goveralls
 $(GOBIN)/goveralls: | $(BASE) ; $(info  building goveralls...)
-	$Q go get github.com/mattn/goveralls
+	$Q env GO111MODULE=off go get github.com/mattn/goveralls
 
 
 # Tests
@@ -96,6 +96,10 @@ COVER_PROFILE = accelerated-bridge.cover
 test-coverage-tools: | $(GOVERALLS)
 test-coverage: test-coverage-tools | $(BASE) ; $(info  running coverage tests...) @ ## Run coverage tests
 	$Q cd $(BASE); $(GO) test -covermode=$(COVERAGE_MODE) -coverprofile=$(COVER_PROFILE) ./...
+
+.PHONY: upload-coverage
+upload-coverage: test-coverage-tools | $(BASE) ; $(info  uploading coverage results...) @ ## Upload coverage report
+	$(GOVERALLS) -coverprofile=$(COVER_PROFILE) -service=github
 
 .PHONY: lint
 lint: | $(BASE) $(GOLANGCI_LINT) ; $(info  running golangci-lint...) @ ## Run golangci-lint

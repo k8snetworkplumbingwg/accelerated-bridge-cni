@@ -1,7 +1,7 @@
 [![Build](https://github.com/k8snetworkplumbingwg/accelerated-bridge-cni/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/k8snetworkplumbingwg/accelerated-bridge-cni/actions/workflows/build.yml)
 [![Publish image](https://github.com/k8snetworkplumbingwg/accelerated-bridge-cni/actions/workflows/image-push.yml/badge.svg?branch=master)](https://github.com/k8snetworkplumbingwg/accelerated-bridge-cni/actions/workflows/image-push.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/accelerated-bridge-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/accelerated-bridge-cni)
-
+[![Coverage Status](https://coveralls.io/repos/github/k8snetworkplumbingwg/accelerated-bridge-cni/badge.svg?branch=master)](https://coveralls.io/github/k8snetworkplumbingwg/accelerated-bridge-cni?branch=master)
    * [Accelerated Bridge CNI plugin](#accelerated-bridge-cni-plugin)
       * [Build](#build)
       * [Kubernetes Quick Start](#kubernetes-quick-start)
