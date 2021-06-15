@@ -16,10 +16,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
 
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/cache"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/config"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/manager"
 	localtypes "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
-	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
 )
 
 type envArgs struct {
@@ -170,7 +170,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Cache PluginConf for CmdDel
-	if err = config.SaveConf(pluginConf, args); err != nil {
+	stateCache := cache.NewStateCache()
+	pRef := stateCache.GetStateRef(pluginConf.Name, args.ContainerID, args.IfName)
+	if err = stateCache.Save(pRef, &pluginConf); err != nil {
 		return fmt.Errorf("failed to save PluginConf %q", err)
 	}
 
@@ -184,7 +186,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		return nil
 	}
 
-	pluginConf, cRefPath, err := config.LoadConfFromCache(args)
+	var err error
 	defer func() {
 		if err == nil {
 			log.Debug().Msg("CmdDel done.")
@@ -192,6 +194,18 @@ func cmdDel(args *skel.CmdArgs) error {
 			log.Error().Msgf("CmdDel failed - %v.", err)
 		}
 	}()
+
+	netConf := &localtypes.NetConf{}
+	err = config.LoadConf(args.StdinData, netConf)
+	if err != nil {
+		return err
+	}
+
+	stateCache := cache.NewStateCache()
+	pRef := stateCache.GetStateRef(netConf.Name, args.ContainerID, args.IfName)
+
+	pluginConf := &localtypes.PluginConf{}
+	err = stateCache.Load(pRef, pluginConf)
 	if err != nil {
 		return err
 	}
@@ -201,8 +215,8 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 
 	defer func() {
-		if err == nil && cRefPath != "" {
-			_ = utils.CleanCachedNetConf(cRefPath)
+		if err == nil {
+			_ = stateCache.Delete(pRef)
 		}
 	}()
 
