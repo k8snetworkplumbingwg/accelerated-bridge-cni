@@ -18,6 +18,7 @@ import (
 
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/config"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/manager"
+	localtypes "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
 )
 
@@ -47,7 +48,8 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
-	netConf, err := config.LoadConf(args.StdinData)
+	pluginConf := &localtypes.PluginConf{}
+	err := config.ParseConf(args.StdinData, pluginConf)
 	defer func() {
 		if err == nil {
 			log.Debug().Msg("CmdAdd done.")
@@ -59,7 +61,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("failed to load netconf: %v", err)
 	}
 
-	if netConf.Debug {
+	if pluginConf.Debug {
 		setDebugMode()
 	}
 
@@ -71,15 +73,15 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if envArgs != nil {
 		MAC := string(envArgs.MAC)
 		if MAC != "" {
-			netConf.MAC = MAC
+			pluginConf.MAC = MAC
 		}
 	}
 
 	// RuntimeConfig takes preference than envArgs.
 	// This maintains compatibility of using envArgs
 	// for MAC config.
-	if netConf.RuntimeConfig.Mac != "" {
-		netConf.MAC = netConf.RuntimeConfig.Mac
+	if pluginConf.RuntimeConfig.Mac != "" {
+		pluginConf.MAC = pluginConf.RuntimeConfig.Mac
 	}
 
 	netns, err := ns.GetNS(args.Netns)
@@ -89,16 +91,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 	defer netns.Close()
 
 	m := manager.NewManager()
-	if err = m.AttachRepresentor(netConf); err != nil {
+	if err = m.AttachRepresentor(pluginConf); err != nil {
 		return fmt.Errorf("failed to attach representor: %v", err)
 	}
 	defer func() {
 		if err != nil {
-			_ = m.DetachRepresentor(netConf)
+			_ = m.DetachRepresentor(pluginConf)
 		}
 	}()
 
-	if err = m.ApplyVFConfig(netConf); err != nil {
+	if err = m.ApplyVFConfig(pluginConf); err != nil {
 		return fmt.Errorf("failed to configure VF %q", err)
 	}
 
@@ -109,7 +111,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}}
 
 	var macAddr string
-	macAddr, err = m.SetupVF(netConf, args.IfName, args.ContainerID, netns)
+	macAddr, err = m.SetupVF(pluginConf, args.IfName, args.ContainerID, netns)
 	defer func() {
 		if err != nil {
 			err = netns.Do(func(_ ns.NetNS) error {
@@ -117,26 +119,26 @@ func cmdAdd(args *skel.CmdArgs) error {
 				return err
 			})
 			if err == nil {
-				_ = m.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+				_ = m.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns)
 			}
 		}
 	}()
 	if err != nil {
 		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v",
-			args.IfName, netConf.PFName, err)
+			args.IfName, pluginConf.PFName, err)
 	}
 
 	// run the IPAM plugin
-	if netConf.IPAM.Type != "" {
+	if pluginConf.IPAM.Type != "" {
 		var r types.Result
-		if r, err = ipam.ExecAdd(netConf.IPAM.Type, args.StdinData); err != nil {
+		if r, err = ipam.ExecAdd(pluginConf.IPAM.Type, args.StdinData); err != nil {
 			return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v",
-				netConf.IPAM.Type, netConf.PFName, err)
+				pluginConf.IPAM.Type, pluginConf.PFName, err)
 		}
 
 		defer func() {
 			if err != nil {
-				_ = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
+				_ = ipam.ExecDel(pluginConf.IPAM.Type, args.StdinData)
 			}
 		}()
 
@@ -168,7 +170,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Cache PluginConf for CmdDel
-	if err = config.SaveConf(netConf, args); err != nil {
+	if err = config.SaveConf(pluginConf, args); err != nil {
 		return fmt.Errorf("failed to save PluginConf %q", err)
 	}
 
@@ -182,7 +184,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		return nil
 	}
 
-	netConf, cRefPath, err := config.LoadConfFromCache(args)
+	pluginConf, cRefPath, err := config.LoadConfFromCache(args)
 	defer func() {
 		if err == nil {
 			log.Debug().Msg("CmdDel done.")
@@ -194,7 +196,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	if netConf.Debug {
+	if pluginConf.Debug {
 		setDebugMode()
 	}
 
@@ -206,12 +208,12 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	m := manager.NewManager()
 
-	if err = m.DetachRepresentor(netConf); err != nil {
+	if err = m.DetachRepresentor(pluginConf); err != nil {
 		log.Warn().Msgf("failed to detach representor: %v", err)
 	}
 
-	if netConf.IPAM.Type != "" {
-		err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
+	if pluginConf.IPAM.Type != "" {
+		err = ipam.ExecDel(pluginConf.IPAM.Type, args.StdinData)
 		if err != nil {
 			return err
 		}
@@ -233,11 +235,11 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if err := m.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
+	if err := m.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns); err != nil {
 		return err
 	}
 
-	if err := m.ResetVFConfig(netConf); err != nil {
+	if err := m.ResetVFConfig(pluginConf); err != nil {
 		return fmt.Errorf("cmdDel() error reseting VF: %q", err)
 	}
 

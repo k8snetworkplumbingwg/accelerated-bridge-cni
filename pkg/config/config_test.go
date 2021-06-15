@@ -3,10 +3,12 @@ package config
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	localtypes "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 )
 
 var _ = Describe("Config", func() {
-	Context("Checking LoadConf function", func() {
+	Context("Checking ParseConf function", func() {
 		It("Assuming correct config file - existing DeviceID", func() {
 			conf := []byte(`{
 		"name": "mynet",
@@ -24,7 +26,7 @@ var _ = Describe("Config", func() {
 			"gateway": "10.55.206.1"
 		}
 		}`)
-			_, err := LoadConf(conf)
+			err := ParseConf(conf, &localtypes.PluginConf{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming incorrect config file - not existing DeviceID", func() {
@@ -42,7 +44,7 @@ var _ = Describe("Config", func() {
 			"gateway": "10.55.206.1"
 		}
 		}`)
-			_, err := LoadConf(conf)
+			err := ParseConf(conf, &localtypes.PluginConf{})
 			Expect(err).To(HaveOccurred())
 		})
 		It("Assuming incorrect config file - broken json", func() {
@@ -60,7 +62,7 @@ var _ = Describe("Config", func() {
 			"gateway": "10.55.206.1"
 		}
 		}`)
-			_, err := LoadConf(conf)
+			err := ParseConf(conf, &localtypes.PluginConf{})
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -71,7 +73,8 @@ var _ = Describe("Config", func() {
 		"deviceID": "0000:af:06.1",
 		"trunk" : [{ "id" : 5 }, { "id": 19, "minID" : 101, "maxID" : 103 }, {"id": 55}, { "minID" : 20, "maxID" : 23 }]
 		}`)
-		cfg, err := LoadConf(conf)
+		cfg := &localtypes.PluginConf{}
+		err := ParseConf(conf, cfg)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg.Trunk).To(BeEquivalentTo([]int{5, 19, 20, 21, 22, 23, 55, 101, 102, 103}))
 
@@ -83,7 +86,7 @@ var _ = Describe("Config", func() {
 		"deviceID": "0000:af:06.1",
 		"vlan" : -222
 		}`)
-		_, err := LoadConf(conf)
+		err := ParseConf(conf, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - vlan ID to large", func() {
@@ -93,7 +96,7 @@ var _ = Describe("Config", func() {
 		"deviceID": "0000:af:06.1",
 		"vlan" : 4095
 		}`)
-		_, err := LoadConf(conf)
+		err := ParseConf(conf, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - trunk minID more that maxID", func() {
@@ -103,7 +106,7 @@ var _ = Describe("Config", func() {
 		"deviceID": "0000:af:06.1",
 		"trunk" : [ { "minID" : 1000, "maxID" : 50 } ]
 		}`)
-		_, err := LoadConf(conf)
+		err := ParseConf(conf, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - trunk negative id", func() {
@@ -113,7 +116,7 @@ var _ = Describe("Config", func() {
 		"deviceID": "0000:af:06.1",
 		"trunk" : [ { "id" : -1000 } ]
 		}`)
-		_, err := LoadConf(conf)
+		err := ParseConf(conf, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - trunk invalid range", func() {
@@ -123,7 +126,7 @@ var _ = Describe("Config", func() {
 		"deviceID": "0000:af:06.1",
 		"trunk" : [ { "minID" : 4000, "maxID": 5000 } ]
 		}`)
-		_, err := LoadConf(conf)
+		err := ParseConf(conf, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	Context("Checking getVfInfo function", func() {

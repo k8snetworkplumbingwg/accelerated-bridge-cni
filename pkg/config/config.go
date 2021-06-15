@@ -18,15 +18,19 @@ const (
 	DefaultBridge = "cni0"
 )
 
-// LoadConf parses and validates stdin netconf and returns PluginConf object
-func LoadConf(bytes []byte) (*localtypes.PluginConf, error) {
-	conf := &localtypes.PluginConf{
-		NetConf: localtypes.NetConf{
-			Debug:  false,
-			Bridge: DefaultBridge,
-		}}
-	if err := json.Unmarshal(bytes, &conf.NetConf); err != nil {
-		return nil, fmt.Errorf("failed to load netconf: %v", err)
+// LoadConf load data from stdin to NetConf object
+func LoadConf(bytes []byte, netConf *localtypes.NetConf) error {
+	netConf.Bridge = DefaultBridge
+	if err := json.Unmarshal(bytes, netConf); err != nil {
+		return fmt.Errorf("failed to load netconf: %v", err)
+	}
+	return nil
+}
+
+// ParseConf load, parses and validates data from stdin to PluginConf object
+func ParseConf(bytes []byte, conf *localtypes.PluginConf) error {
+	if err := LoadConf(bytes, &conf.NetConf); err != nil {
+		return err
 	}
 
 	conf.MAC = conf.NetConf.MAC
@@ -36,39 +40,39 @@ func LoadConf(bytes []byte) (*localtypes.PluginConf, error) {
 		// Get rest of the VF information
 		pfName, vfID, err := getVfInfo(conf.DeviceID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get VF information: %q", err)
+			return fmt.Errorf("failed to get VF information: %q", err)
 		}
 		conf.VFID = vfID
 		conf.PFName = pfName
 	} else {
-		return nil, fmt.Errorf("VF pci addr is required")
+		return fmt.Errorf("VF pci addr is required")
 	}
 
 	// Assuming VF is netdev interface; Get interface name
 	hostIFName, err := utils.GetVFLinkName(conf.DeviceID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get VF name: %s", err)
+		return fmt.Errorf("failed to get VF name: %s", err)
 	}
 	if hostIFName == "" {
-		return nil, fmt.Errorf("VF name is empty")
+		return fmt.Errorf("VF name is empty")
 	}
 
 	conf.OrigVfState.HostIFName = hostIFName
 
 	// validate vlan id range
 	if conf.Vlan < 0 || conf.Vlan > 4094 {
-		return nil, fmt.Errorf("vlan id %d invalid: value must be in the range 0-4094", conf.Vlan)
+		return fmt.Errorf("vlan id %d invalid: value must be in the range 0-4094", conf.Vlan)
 	}
 
 	// validate trunk settings
 	if len(conf.NetConf.Trunk) > 0 {
 		conf.Trunk, err = splitVlanIds(conf.NetConf.Trunk)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return conf, nil
+	return nil
 }
 
 // SaveConf serialize and save PluginConf to cache
