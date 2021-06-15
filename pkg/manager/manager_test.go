@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/vishvananda/netlink"
 
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/manager/mocks"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
-	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types/mocks"
 )
 
 // Fake NS - implements ns.NetNS interface
@@ -98,7 +98,7 @@ var _ = Describe("Manager", func() {
 
 		It("Assuming existing interface", func() {
 			targetNetNS := newFakeNs()
-			mocked := &mocks.NetlinkManager{}
+			mocked := &mocks.Netlink{}
 			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
 
 			Expect(err).NotTo(HaveOccurred())
@@ -122,7 +122,7 @@ var _ = Describe("Manager", func() {
 		})
 		It("Setting mac address", func() {
 			targetNetNS := newFakeNs()
-			mocked := &mocks.NetlinkManager{}
+			mocked := &mocks.Netlink{}
 			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
 			Expect(err).NotTo(HaveOccurred())
 			netconf.MAC = "e4:11:22:33:44:55"
@@ -173,7 +173,7 @@ var _ = Describe("Manager", func() {
 		})
 		It("Assuming existing interface", func() {
 			targetNetNS := newFakeNs()
-			mocked := &mocks.NetlinkManager{}
+			mocked := &mocks.Netlink{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.ContIFNames).Return(fakeLink, nil)
@@ -212,7 +212,7 @@ var _ = Describe("Manager", func() {
 		})
 		It("Restores Effective MAC address when provided in netconf", func() {
 			targetNetNS := newFakeNs()
-			mocked := &mocks.NetlinkManager{}
+			mocked := &mocks.Netlink{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.ContIFNames).Return(fakeLink, nil)
@@ -247,7 +247,7 @@ var _ = Describe("Manager", func() {
 			}
 		})
 		It("Does not change VF config if it wasnt requested to be changed in netconf", func() {
-			mocked := &mocks.NetlinkManager{}
+			mocked := &mocks.Netlink{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.PFName).Return(fakeLink, nil)
@@ -281,7 +281,7 @@ var _ = Describe("Manager", func() {
 			}
 		})
 		It("Restores original VF configurations", func() {
-			mocked := &mocks.NetlinkManager{}
+			mocked := &mocks.Netlink{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.PFName).Return(fakeLink, nil)
@@ -315,7 +315,7 @@ var _ = Describe("Manager", func() {
 			zerolog.SetGlobalLevel(zerolog.Disabled)
 		})
 		It("Attaching dummy link to the bridge (success)", func() {
-			mockedNl := &mocks.NetlinkManager{}
+			mockedNl := &mocks.Netlink{}
 			mockedSr := &mocks.Sriovnet{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
@@ -345,7 +345,7 @@ var _ = Describe("Manager", func() {
 			mockedSr.AssertExpectations(t)
 		})
 		It("Attaching dummy link to the bridge (failure)", func() {
-			mockedNl := &mocks.NetlinkManager{}
+			mockedNl := &mocks.Netlink{}
 			mockedSr := &mocks.Sriovnet{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
@@ -384,7 +384,7 @@ var _ = Describe("Manager", func() {
 			zerolog.SetGlobalLevel(zerolog.Disabled)
 		})
 		It("Detaching dummy link from the bridge (success)", func() {
-			mocked := &mocks.NetlinkManager{}
+			mocked := &mocks.Netlink{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
 				MasterIndex: 1000,
@@ -404,7 +404,7 @@ var _ = Describe("Manager", func() {
 			mocked.AssertExpectations(t)
 		})
 		It("Detaching dummy link from the bridge (failure)", func() {
-			mocked := &mocks.NetlinkManager{}
+			mocked := &mocks.Netlink{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
 				MasterIndex: 1000,
