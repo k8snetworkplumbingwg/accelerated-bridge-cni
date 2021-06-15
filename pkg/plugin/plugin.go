@@ -8,7 +8,6 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
-	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -49,7 +48,26 @@ func setDebugMode() {
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 }
 
-func CmdAdd(args *skel.CmdArgs) error {
+// NewPlugin create and initialize accelerated-bridge-cni Plugin object
+func NewPlugin() *Plugin {
+	return &Plugin{
+		netNS:   &nsWrapper{},
+		ipam:    &ipamWrapper{},
+		manager: manager.NewManager(),
+		cache:   cache.NewStateCache(),
+	}
+}
+
+// Plugin is accelerated-bridge-cni implementation
+type Plugin struct {
+	netNS   NS
+	ipam    IPAM
+	manager manager.Manager
+	cache   cache.StateCache
+}
+
+// CmdAdd implementation of accelerated-bridge-cni plugin
+func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 	pluginConf := &localtypes.PluginConf{}
 	err := config.ParseConf(args.StdinData, pluginConf)
 	defer func() {
@@ -86,23 +104,22 @@ func CmdAdd(args *skel.CmdArgs) error {
 		pluginConf.MAC = pluginConf.RuntimeConfig.Mac
 	}
 
-	netns, err := ns.GetNS(args.Netns)
+	netns, err := p.netNS.GetNS(args.Netns)
 	if err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", netns, err)
 	}
 	defer netns.Close()
 
-	m := manager.NewManager()
-	if err = m.AttachRepresentor(pluginConf); err != nil {
+	if err = p.manager.AttachRepresentor(pluginConf); err != nil {
 		return fmt.Errorf("failed to attach representor: %v", err)
 	}
 	defer func() {
 		if err != nil {
-			_ = m.DetachRepresentor(pluginConf)
+			_ = p.manager.DetachRepresentor(pluginConf)
 		}
 	}()
 
-	if err = m.ApplyVFConfig(pluginConf); err != nil {
+	if err = p.manager.ApplyVFConfig(pluginConf); err != nil {
 		return fmt.Errorf("failed to configure VF %q", err)
 	}
 
@@ -113,7 +130,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 	}}
 
 	var macAddr string
-	macAddr, err = m.SetupVF(pluginConf, args.IfName, args.ContainerID, netns)
+	macAddr, err = p.manager.SetupVF(pluginConf, args.IfName, args.ContainerID, netns)
 	defer func() {
 		if err != nil {
 			err = netns.Do(func(_ ns.NetNS) error {
@@ -121,7 +138,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 				return err
 			})
 			if err == nil {
-				_ = m.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns)
+				_ = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns)
 			}
 		}
 	}()
@@ -133,14 +150,14 @@ func CmdAdd(args *skel.CmdArgs) error {
 	// run the IPAM plugin
 	if pluginConf.IPAM.Type != "" {
 		var r types.Result
-		if r, err = ipam.ExecAdd(pluginConf.IPAM.Type, args.StdinData); err != nil {
+		if r, err = p.ipam.ExecAdd(pluginConf.IPAM.Type, args.StdinData); err != nil {
 			return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v",
 				pluginConf.IPAM.Type, pluginConf.PFName, err)
 		}
 
 		defer func() {
 			if err != nil {
-				_ = ipam.ExecDel(pluginConf.IPAM.Type, args.StdinData)
+				_ = p.ipam.ExecDel(pluginConf.IPAM.Type, args.StdinData)
 			}
 		}()
 
@@ -163,7 +180,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 		}
 
 		err = netns.Do(func(_ ns.NetNS) error {
-			return ipam.ConfigureIface(args.IfName, newResult)
+			return p.ipam.ConfigureIface(args.IfName, newResult)
 		})
 		if err != nil {
 			return err
@@ -172,16 +189,16 @@ func CmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Cache PluginConf for CmdDel
-	stateCache := cache.NewStateCache()
-	pRef := stateCache.GetStateRef(pluginConf.Name, args.ContainerID, args.IfName)
-	if err = stateCache.Save(pRef, &pluginConf); err != nil {
+	pRef := p.cache.GetStateRef(pluginConf.Name, args.ContainerID, args.IfName)
+	if err = p.cache.Save(pRef, &pluginConf); err != nil {
 		return fmt.Errorf("failed to save PluginConf %q", err)
 	}
 
 	return types.PrintResult(result, current.ImplementedSpecVersion)
 }
 
-func CmdDel(args *skel.CmdArgs) error {
+// CmdDel implementation of accelerated-bridge-cni plugin
+func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
 	// https://github.com/kubernetes/kubernetes/pull/35240
 	if args.Netns == "" {
 		log.Warn().Msgf("CmdDel skipping - netns is not provided.")
@@ -203,11 +220,10 @@ func CmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	stateCache := cache.NewStateCache()
-	pRef := stateCache.GetStateRef(netConf.Name, args.ContainerID, args.IfName)
+	pRef := p.cache.GetStateRef(netConf.Name, args.ContainerID, args.IfName)
 
 	pluginConf := &localtypes.PluginConf{}
-	err = stateCache.Load(pRef, pluginConf)
+	err = p.cache.Load(pRef, pluginConf)
 	if err != nil {
 		return err
 	}
@@ -218,24 +234,22 @@ func CmdDel(args *skel.CmdArgs) error {
 
 	defer func() {
 		if err == nil {
-			_ = stateCache.Delete(pRef)
+			_ = p.cache.Delete(pRef)
 		}
 	}()
 
-	m := manager.NewManager()
-
-	if err = m.DetachRepresentor(pluginConf); err != nil {
+	if err = p.manager.DetachRepresentor(pluginConf); err != nil {
 		log.Warn().Msgf("failed to detach representor: %v", err)
 	}
 
 	if pluginConf.IPAM.Type != "" {
-		err = ipam.ExecDel(pluginConf.IPAM.Type, args.StdinData)
+		err = p.ipam.ExecDel(pluginConf.IPAM.Type, args.StdinData)
 		if err != nil {
 			return err
 		}
 	}
 
-	netns, err := ns.GetNS(args.Netns)
+	netns, err := p.netNS.GetNS(args.Netns)
 	if err != nil {
 		// according to:
 		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
@@ -251,17 +265,18 @@ func CmdDel(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if err := m.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns); err != nil {
+	if err := p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns); err != nil {
 		return err
 	}
 
-	if err := m.ResetVFConfig(pluginConf); err != nil {
+	if err := p.manager.ResetVFConfig(pluginConf); err != nil {
 		return fmt.Errorf("cmdDel() error reseting VF: %q", err)
 	}
 
 	return nil
 }
 
-func CmdCheck(args *skel.CmdArgs) error {
+// CmdCheck implementation of accelerated-bridge-cni plugin
+func (p *Plugin) CmdCheck(args *skel.CmdArgs) error {
 	return nil
 }

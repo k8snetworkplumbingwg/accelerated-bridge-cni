@@ -22,5 +22,6 @@ func setupLogger() {
 
 func main() {
 	setupLogger()
-	skel.PluginMain(plugin.CmdAdd, plugin.CmdCheck, plugin.CmdDel, version.All, "")
+	p := plugin.NewPlugin()
+	skel.PluginMain(p.CmdAdd, p.CmdCheck, p.CmdDel, version.All, "")
 }
