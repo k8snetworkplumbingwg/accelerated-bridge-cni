@@ -54,6 +54,7 @@ func NewPlugin() *Plugin {
 		netNS:   &nsWrapper{},
 		ipam:    &ipamWrapper{},
 		manager: manager.NewManager(),
+		config:  config.NewConfig(),
 		cache:   cache.NewStateCache(),
 	}
 }
@@ -63,13 +64,14 @@ type Plugin struct {
 	netNS   NS
 	ipam    IPAM
 	manager manager.Manager
+	config  config.Loader
 	cache   cache.StateCache
 }
 
 // CmdAdd implementation of accelerated-bridge-cni plugin
 func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 	pluginConf := &localtypes.PluginConf{}
-	err := config.ParseConf(args.StdinData, pluginConf)
+	err := p.config.ParseConf(args.StdinData, pluginConf)
 	defer func() {
 		if err == nil {
 			log.Debug().Msg("CmdAdd done.")
@@ -215,7 +217,7 @@ func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
 	}()
 
 	netConf := &localtypes.NetConf{}
-	err = config.LoadConf(args.StdinData, netConf)
+	err = p.config.LoadConf(args.StdinData, netConf)
 	if err != nil {
 		return err
 	}
