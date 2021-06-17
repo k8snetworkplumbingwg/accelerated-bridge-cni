@@ -13,8 +13,21 @@ const (
 	DefaultBridge = "cni0"
 )
 
+type Loader interface {
+	LoadConf(bytes []byte, netConf *localtypes.NetConf) error
+	ParseConf(bytes []byte, conf *localtypes.PluginConf) error
+}
+
+// NewConfig create and initialize Config struct
+func NewConfig() *Config {
+	return &Config{}
+}
+
+// Config provides function to load and parse cni configuration
+type Config struct{}
+
 // LoadConf load data from stdin to NetConf object
-func LoadConf(bytes []byte, netConf *localtypes.NetConf) error {
+func (c *Config) LoadConf(bytes []byte, netConf *localtypes.NetConf) error {
 	netConf.Bridge = DefaultBridge
 	if err := json.Unmarshal(bytes, netConf); err != nil {
 		return fmt.Errorf("failed to load netconf: %v", err)
@@ -23,8 +36,8 @@ func LoadConf(bytes []byte, netConf *localtypes.NetConf) error {
 }
 
 // ParseConf load, parses and validates data from stdin to PluginConf object
-func ParseConf(bytes []byte, conf *localtypes.PluginConf) error {
-	if err := LoadConf(bytes, &conf.NetConf); err != nil {
+func (c *Config) ParseConf(bytes []byte, conf *localtypes.PluginConf) error {
+	if err := c.LoadConf(bytes, &conf.NetConf); err != nil {
 		return err
 	}
 

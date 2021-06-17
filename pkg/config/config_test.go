@@ -8,9 +8,12 @@ import (
 )
 
 var _ = Describe("Config", func() {
+
+	conf := NewConfig()
+
 	Context("Checking ParseConf function", func() {
 		It("Assuming correct config file - existing DeviceID", func() {
-			conf := []byte(`{
+			data := []byte(`{
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
@@ -26,11 +29,11 @@ var _ = Describe("Config", func() {
 			"gateway": "10.55.206.1"
 		}
 		}`)
-			err := ParseConf(conf, &localtypes.PluginConf{})
+			err := conf.ParseConf(data, &localtypes.PluginConf{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming incorrect config file - not existing DeviceID", func() {
-			conf := []byte(`{
+			data := []byte(`{
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.3",
@@ -44,11 +47,11 @@ var _ = Describe("Config", func() {
 			"gateway": "10.55.206.1"
 		}
 		}`)
-			err := ParseConf(conf, &localtypes.PluginConf{})
+			err := conf.ParseConf(data, &localtypes.PluginConf{})
 			Expect(err).To(HaveOccurred())
 		})
 		It("Assuming incorrect config file - broken json", func() {
-			conf := []byte(`{
+			data := []byte(`{
 		"name": "mynet"
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
@@ -62,71 +65,71 @@ var _ = Describe("Config", func() {
 			"gateway": "10.55.206.1"
 		}
 		}`)
-			err := ParseConf(conf, &localtypes.PluginConf{})
+			err := conf.ParseConf(data, &localtypes.PluginConf{})
 			Expect(err).To(HaveOccurred())
 		})
 	})
 	It("Assuming correct config file - complex trunk config", func() {
-		conf := []byte(`{
+		data := []byte(`{
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
 		"trunk" : [{ "id" : 5 }, { "id": 19, "minID" : 101, "maxID" : 103 }, {"id": 55}, { "minID" : 20, "maxID" : 23 }]
 		}`)
 		cfg := &localtypes.PluginConf{}
-		err := ParseConf(conf, cfg)
+		err := conf.ParseConf(data, cfg)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg.Trunk).To(BeEquivalentTo([]int{5, 19, 20, 21, 22, 23, 55, 101, 102, 103}))
 
 	})
 	It("Assuming incorrect config file - negative vlan ID", func() {
-		conf := []byte(`{
+		data := []byte(`{
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
 		"vlan" : -222
 		}`)
-		err := ParseConf(conf, &localtypes.PluginConf{})
+		err := conf.ParseConf(data, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - vlan ID to large", func() {
-		conf := []byte(`{
+		data := []byte(`{
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
 		"vlan" : 4095
 		}`)
-		err := ParseConf(conf, &localtypes.PluginConf{})
+		err := conf.ParseConf(data, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - trunk minID more that maxID", func() {
-		conf := []byte(`{
+		data := []byte(`{
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
 		"trunk" : [ { "minID" : 1000, "maxID" : 50 } ]
 		}`)
-		err := ParseConf(conf, &localtypes.PluginConf{})
+		err := conf.ParseConf(data, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - trunk negative id", func() {
-		conf := []byte(`{
+		data := []byte(`{
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
 		"trunk" : [ { "id" : -1000 } ]
 		}`)
-		err := ParseConf(conf, &localtypes.PluginConf{})
+		err := conf.ParseConf(data, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - trunk invalid range", func() {
-		conf := []byte(`{
+		data := []byte(`{
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
 		"trunk" : [ { "minID" : 4000, "maxID": 5000 } ]
 		}`)
-		err := ParseConf(conf, &localtypes.PluginConf{})
+		err := conf.ParseConf(data, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
 	})
 	Context("Checking getVfInfo function", func() {
