@@ -135,11 +135,11 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 	macAddr, err = p.manager.SetupVF(pluginConf, args.IfName, args.ContainerID, netns)
 	defer func() {
 		if err != nil {
-			err = netns.Do(func(_ ns.NetNS) error {
-				_, err = netlink.LinkByName(args.IfName)
-				return err
+			netNSErr := netns.Do(func(_ ns.NetNS) error {
+				_, intErr := netlink.LinkByName(args.IfName)
+				return intErr
 			})
-			if err == nil {
+			if netNSErr == nil {
 				_ = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns)
 			}
 		}
@@ -170,7 +170,8 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 		}
 
 		if len(newResult.IPs) == 0 {
-			return errors.New("IPAM plugin returned missing IP config")
+			err = errors.New("IPAM plugin returned missing IP config")
+			return err
 		}
 
 		newResult.Interfaces = result.Interfaces
@@ -192,7 +193,7 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 
 	// Cache PluginConf for CmdDel
 	pRef := p.cache.GetStateRef(pluginConf.Name, args.ContainerID, args.IfName)
-	if err = p.cache.Save(pRef, &pluginConf); err != nil {
+	if err = p.cache.Save(pRef, pluginConf); err != nil {
 		return fmt.Errorf("failed to save PluginConf %q", err)
 	}
 
@@ -267,11 +268,13 @@ func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if err := p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns); err != nil {
+	//nolint:gocritic
+	if err = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns); err != nil {
 		return err
 	}
 
-	if err := p.manager.ResetVFConfig(pluginConf); err != nil {
+	//nolint:gocritic
+	if err = p.manager.ResetVFConfig(pluginConf); err != nil {
 		return fmt.Errorf("cmdDel() error reseting VF: %q", err)
 	}
 
