@@ -19,29 +19,12 @@ import (
 	localtypes "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 )
 
-type envArgs struct {
-	types.CommonArgs
-	MAC types.UnmarshallableString `json:"mac,omitempty"`
-}
-
 //nolint:gochecknoinits
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
 	// since namespace ops (unshare, setns) are done for a single thread, we
 	// must ensure that the goroutine does not jump from OS thread to thread
 	runtime.LockOSThread()
-}
-
-func getEnvArgs(envArgsString string) (*envArgs, error) {
-	if envArgsString != "" {
-		e := envArgs{}
-		err := types.LoadArgs(envArgsString, &e)
-		if err != nil {
-			return nil, err
-		}
-		return &e, nil
-	}
-	return nil, nil
 }
 
 func setDebugMode() {
@@ -70,80 +53,76 @@ type Plugin struct {
 
 // CmdAdd implementation of accelerated-bridge-cni plugin
 func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
-	pluginConf := &localtypes.PluginConf{}
-	err := p.config.ParseConf(args.StdinData, pluginConf)
+	var err error
+
 	defer func() {
 		if err == nil {
 			log.Debug().Msg("CmdAdd done.")
-		} else {
-			log.Error().Msgf("CmdAdd failed - %v.", err)
 		}
 	}()
+
+	cmdCtx := &cmdContext{
+		args:       args,
+		pluginConf: &localtypes.PluginConf{},
+		result:     &current.Result{},
+	}
+	defer func() {
+		cmdCtx.handleError(err)
+	}()
+
+	cmdCtx.registerErrorHandler(func() {
+		log.Error().Msgf("CmdAdd failed - %v.", err)
+	})
+
+	err = p.config.ParseConf(args.StdinData, cmdCtx.pluginConf)
 	if err != nil {
 		return fmt.Errorf("failed to load netconf: %v", err)
 	}
 
+	pluginConf := cmdCtx.pluginConf
 	if pluginConf.Debug {
 		setDebugMode()
 	}
 
-	envArgs, err := getEnvArgs(args.Args)
+	cmdCtx.netNS, err = p.netNS.GetNS(args.Netns)
 	if err != nil {
-		return fmt.Errorf("failed to parse args: %v", err)
+		return fmt.Errorf("failed to open netns %q: %v", args.Netns, err)
 	}
+	defer cmdCtx.netNS.Close()
 
-	if envArgs != nil {
-		MAC := string(envArgs.MAC)
-		if MAC != "" {
-			pluginConf.MAC = MAC
-		}
-	}
+	cmdCtx.result.Interfaces = []*current.Interface{{
+		Name:    args.IfName,
+		Sandbox: cmdCtx.netNS.Path(),
+	}}
 
-	// RuntimeConfig takes preference than envArgs.
-	// This maintains compatibility of using envArgs
-	// for MAC config.
-	if pluginConf.RuntimeConfig.Mac != "" {
-		pluginConf.MAC = pluginConf.RuntimeConfig.Mac
-	}
-
-	netns, err := p.netNS.GetNS(args.Netns)
+	err = p.getMACAddressConfig(cmdCtx)
 	if err != nil {
-		return fmt.Errorf("failed to open netns %q: %v", netns, err)
+		return fmt.Errorf("failed to get MAC config: %v", err)
 	}
-	defer netns.Close()
 
 	if err = p.manager.AttachRepresentor(pluginConf); err != nil {
 		return fmt.Errorf("failed to attach representor: %v", err)
 	}
-	defer func() {
-		if err != nil {
-			_ = p.manager.DetachRepresentor(pluginConf)
-		}
-	}()
+	cmdCtx.registerErrorHandler(func() {
+		_ = p.manager.DetachRepresentor(pluginConf)
+	})
 
 	if err = p.manager.ApplyVFConfig(pluginConf); err != nil {
 		return fmt.Errorf("failed to configure VF %q", err)
 	}
 
-	result := &current.Result{}
-	result.Interfaces = []*current.Interface{{
-		Name:    args.IfName,
-		Sandbox: netns.Path(),
-	}}
-
 	var macAddr string
-	macAddr, err = p.manager.SetupVF(pluginConf, args.IfName, args.ContainerID, netns)
-	defer func() {
-		if err != nil {
-			netNSErr := netns.Do(func(_ ns.NetNS) error {
-				_, intErr := netlink.LinkByName(args.IfName)
-				return intErr
-			})
-			if netNSErr == nil {
-				_ = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns)
-			}
+	macAddr, err = p.manager.SetupVF(pluginConf, args.IfName, args.ContainerID, cmdCtx.netNS)
+	cmdCtx.registerErrorHandler(func() {
+		netNSErr := cmdCtx.netNS.Do(func(_ ns.NetNS) error {
+			_, intErr := netlink.LinkByName(args.IfName)
+			return intErr
+		})
+		if netNSErr == nil {
+			_ = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, cmdCtx.netNS)
 		}
-	}()
+	})
+
 	if err != nil {
 		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v",
 			args.IfName, pluginConf.PFName, err)
@@ -151,53 +130,89 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 
 	// run the IPAM plugin
 	if pluginConf.IPAM.Type != "" {
-		var r types.Result
-		if r, err = p.ipam.ExecAdd(pluginConf.IPAM.Type, args.StdinData); err != nil {
-			return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v",
-				pluginConf.IPAM.Type, pluginConf.PFName, err)
-		}
-
-		defer func() {
-			if err != nil {
-				_ = p.ipam.ExecDel(pluginConf.IPAM.Type, args.StdinData)
-			}
-		}()
-
-		// Convert the IPAM result into the current Result type
-		var newResult *current.Result
-		if newResult, err = current.NewResultFromResult(r); err != nil {
-			return err
-		}
-
-		if len(newResult.IPs) == 0 {
-			err = errors.New("IPAM plugin returned missing IP config")
-			return err
-		}
-
-		newResult.Interfaces = result.Interfaces
-		newResult.Interfaces[0].Mac = macAddr
-
-		for _, ipc := range newResult.IPs {
-			// All addresses apply to the container interface (move from host)
-			ipc.Interface = current.Int(0)
-		}
-
-		err = netns.Do(func(_ ns.NetNS) error {
-			return p.ipam.ConfigureIface(args.IfName, newResult)
-		})
+		err = p.configureIPAM(cmdCtx, macAddr)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to configure IPAM: %v", err)
 		}
-		result = newResult
 	}
-
 	// Cache PluginConf for CmdDel
 	pRef := p.cache.GetStateRef(pluginConf.Name, args.ContainerID, args.IfName)
 	if err = p.cache.Save(pRef, pluginConf); err != nil {
 		return fmt.Errorf("failed to save PluginConf %q", err)
 	}
 
-	return types.PrintResult(result, current.ImplementedSpecVersion)
+	return types.PrintResult(cmdCtx.result, current.ImplementedSpecVersion)
+}
+
+// mac address configuration can be supplied as
+// top-level configuration option in cni conf,
+// as env variable and in RuntimeConfig section in cni conf
+// priority: 1. runtime config 2. env 3. top-level option
+func (p *Plugin) getMACAddressConfig(cmdCtx *cmdContext) error {
+	envArgs, err := getEnvArgs(cmdCtx.args.Args)
+	if err != nil {
+		return fmt.Errorf("failed to parse args: %v", err)
+	}
+	pluginConf := cmdCtx.pluginConf
+	if envArgs != nil {
+		MAC := string(envArgs.MAC)
+		if MAC != "" {
+			pluginConf.MAC = MAC
+		}
+	}
+	// RuntimeConfig takes preference than envArgs.
+	// This maintains compatibility of using envArgs
+	// for MAC config.
+	if pluginConf.RuntimeConfig.Mac != "" {
+		pluginConf.MAC = pluginConf.RuntimeConfig.Mac
+	}
+	return nil
+}
+
+// call ipam plugin
+func (p *Plugin) configureIPAM(cmdCtx *cmdContext, macAddr string) error {
+	var ipamResult types.Result
+	var err error
+
+	pluginConf := cmdCtx.pluginConf
+	args := cmdCtx.args
+
+	if ipamResult, err = p.ipam.ExecAdd(pluginConf.IPAM.Type, args.StdinData); err != nil {
+		return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v",
+			pluginConf.IPAM.Type, pluginConf.PFName, err)
+	}
+
+	cmdCtx.registerErrorHandler(func() {
+		_ = p.ipam.ExecDel(pluginConf.IPAM.Type, args.StdinData)
+	})
+
+	// Convert the IPAM result into the current Result type
+	var newResult *current.Result
+	if newResult, err = current.NewResultFromResult(ipamResult); err != nil {
+		return err
+	}
+
+	if len(newResult.IPs) == 0 {
+		err = errors.New("IPAM plugin returned missing IP config")
+		return err
+	}
+
+	newResult.Interfaces = cmdCtx.result.Interfaces
+	newResult.Interfaces[0].Mac = macAddr
+
+	for _, ipc := range newResult.IPs {
+		// All addresses apply to the container interface (move from host)
+		ipc.Interface = current.Int(0)
+	}
+
+	err = cmdCtx.netNS.Do(func(_ ns.NetNS) error {
+		return p.ipam.ConfigureIface(args.IfName, newResult)
+	})
+	if err != nil {
+		return err
+	}
+	cmdCtx.result = newResult
+	return nil
 }
 
 // CmdDel implementation of accelerated-bridge-cni plugin
