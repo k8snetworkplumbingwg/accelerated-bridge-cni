@@ -29,13 +29,13 @@ func splitVlanIds(trunks []types.Trunk) ([]int, error) {
 		var minID, maxID, id int
 		if item.MinID != nil {
 			minID = *item.MinID
-			if minID < 0 || minID > 4096 {
+			if vlanIDIsOutOfRange(minID) {
 				return nil, errors.New("incorrect trunk minID parameter")
 			}
 		}
 		if item.MaxID != nil {
 			maxID = *item.MaxID
-			if maxID < 0 || maxID > 4096 {
+			if vlanIDIsOutOfRange(maxID) {
 				return nil, errors.New("incorrect trunk maxID parameter")
 			}
 			if maxID < minID {
@@ -49,7 +49,7 @@ func splitVlanIds(trunks []types.Trunk) ([]int, error) {
 		}
 		if item.ID != nil {
 			id = *item.ID
-			if id < 0 || minID > 4096 {
+			if vlanIDIsOutOfRange(id) {
 				return nil, errors.New("incorrect trunk id parameter")
 			}
 			vlans[id] = true
@@ -64,4 +64,10 @@ func splitVlanIds(trunks []types.Trunk) ([]int, error) {
 	}
 	sort.Slice(vlanIds, func(i, j int) bool { return vlanIds[i] < vlanIds[j] })
 	return vlanIds, nil
+}
+
+// check that vlanID is in range 1-4094
+// reserved VLANs (0, 4095) can't be set on Linux bridge
+func vlanIDIsOutOfRange(vlanID int) bool {
+	return vlanID < 1 || vlanID > 4094
 }

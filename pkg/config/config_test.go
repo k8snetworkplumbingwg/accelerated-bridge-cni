@@ -127,7 +127,7 @@ var _ = Describe("Config", func() {
 		"name": "mynet",
 		"type": "accelerated-bridge",
 		"deviceID": "0000:af:06.1",
-		"trunk" : [ { "minID" : 4000, "maxID": 5000 } ]
+		"trunk" : [ { "minID" : 0, "maxID": 4095 } ]
 		}`)
 		err := conf.ParseConf(data, &localtypes.PluginConf{})
 		Expect(err).To(HaveOccurred())
