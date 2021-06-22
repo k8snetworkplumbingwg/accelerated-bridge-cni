@@ -140,6 +140,7 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 		successfullyGetNS := func() {
 			successfullyParseConfig()
 			nsMock.On("GetNS", testValidNSPath).Return(netNSMock, nil).Once()
+			netNSMock.On("Path").Return(testValidNSPath).Once()
 		}
 		successfullyAttachRepresentor := func() {
 			successfullyGetNS()
@@ -148,7 +149,6 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 		successfullyApplyVFConfig := func() {
 			successfullyAttachRepresentor()
 			managerMock.On("ApplyVFConfig", pluginConf).Return(nil).Once()
-			netNSMock.On("Path").Return(testValidNSPath).Once()
 		}
 		successfullySetupVF := func() {
 			successfullyApplyVFConfig()
