@@ -24,7 +24,7 @@ linters-settings:
   gocognit:
     min-complexity: 30
   goimports:
-    local-prefixes: github.com/Mellanox/ib-sriov-cni
+    local-prefixes: github.com/k8snetworkplumbingwg/accelerated-bridge-cni
   golint:
     min-confidence: 0
   gomnd:
@@ -60,11 +60,11 @@ linters:
     - dogsled
     - dupl
     - errcheck
-      #- funlen # FIXME main.go:cmdAdd & manager.go:ApplyVFConfig
+    - funlen
     - gochecknoinits
     - goconst
     - gocritic
-      #- gocognit # FIXME config.go:LoadConf
+    - gocognit
     - gofmt
     - goimports
     - golint
