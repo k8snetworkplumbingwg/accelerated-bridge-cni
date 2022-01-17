@@ -44,25 +44,27 @@ func (c *Config) ParseConf(bytes []byte, conf *localtypes.PluginConf) error {
 	conf.MAC = conf.NetConf.MAC
 
 	// DeviceID takes precedence; if we are given a VF pciaddr then work from there
-	if conf.DeviceID != "" {
-		// Get rest of the VF information
-		pfName, vfID, err := getVfInfo(conf.DeviceID)
-		if err != nil {
-			return fmt.Errorf("failed to get VF information: %q", err)
-		}
-		conf.VFID = vfID
-		conf.PFName = pfName
-	} else {
+	if conf.DeviceID == "" {
 		return fmt.Errorf("VF pci addr is required")
+	}
+
+	// Get rest of the VF information
+	var err error
+	conf.PFName, conf.VFID, err = getVfInfo(conf.DeviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get VF information: %q", err)
 	}
 
 	// Assuming VF is netdev interface; Get interface name
 	hostIFName, err := utils.GetVFLinkName(conf.DeviceID)
-	if err != nil {
-		return fmt.Errorf("failed to get VF name: %s", err)
-	}
-	if hostIFName == "" {
-		return fmt.Errorf("VF name is empty")
+	if err != nil || hostIFName == "" {
+		conf.IsUserspaceDriver, err = utils.HasUserspaceDriver(conf.DeviceID)
+		if err != nil {
+			return fmt.Errorf("failed to detect if VF %s has userspace driver %q", conf.DeviceID, err)
+		}
+		if !conf.IsUserspaceDriver {
+			return fmt.Errorf("the VF %s does not have a interface name or a userspace driver", conf.DeviceID)
+		}
 	}
 
 	conf.OrigVfState.HostIFName = hostIFName

@@ -41,4 +41,16 @@ var _ = Describe("Utils", func() {
 			Expect(err).To(HaveOccurred(), "Not existing VF should return an error")
 		})
 	})
+	Context("Checking HasUserspaceDriver function", func() {
+		It("Use userspace driver", func() {
+			result, err := HasUserspaceDriver("0000:11:00.0")
+			Expect(err).NotTo(HaveOccurred(), "HasUserspaceDriver should not return an error")
+			Expect(result).To(BeTrue(), "HasUserspaceDriver should return true")
+		})
+		It("Has not userspace driver", func() {
+			result, err := HasUserspaceDriver("0000:12:00.0")
+			Expect(result).To(BeFalse())
+			Expect(err).NotTo(HaveOccurred(), "HasUserspaceDriver should not return an error")
+		})
+	})
 })

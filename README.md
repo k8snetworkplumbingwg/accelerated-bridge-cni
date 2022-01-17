@@ -29,6 +29,10 @@ A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allo
 
 Accelerated Bridge plugin assumes that Linux Bridge is already exist and correctly configured on nodes.
 
+CNI plugin also supports VF bound to userspace driver (currently only vfio-pci) which may be utilized
+for virtualization use-case i.e [KubeVirt](https://github.com/kubevirt/kubevirt).
+If CNI plugin detects that VF bounded to a userspace driver, it will skip step with VF netdev configuration.
+
 ## Build
 
 This plugin uses Go modules for dependency management and requires Go 1.13+ to build.

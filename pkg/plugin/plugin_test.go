@@ -132,37 +132,49 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 	})
 
 	Describe("CmdAdd", func() {
-		successfullyParseConfig := func() {
+		successfullyParseConfig := func(_ bool) {
 			configMock.On("ParseConf", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 				*args[1].(*localtypes.PluginConf) = *pluginConf
 			}).Return(nil).Once()
 		}
-		successfullyGetNS := func() {
-			successfullyParseConfig()
+		successfullyGetNS := func(withDeps bool) {
+			if withDeps {
+				successfullyParseConfig(true)
+			}
 			nsMock.On("GetNS", testValidNSPath).Return(netNSMock, nil).Once()
 			netNSMock.On("Path").Return(testValidNSPath).Once()
 		}
-		successfullyAttachRepresentor := func() {
-			successfullyGetNS()
+		successfullyAttachRepresentor := func(withDeps bool) {
+			if withDeps {
+				successfullyGetNS(true)
+			}
 			managerMock.On("AttachRepresentor", pluginConf).Return(nil).Once()
 		}
-		successfullyApplyVFConfig := func() {
-			successfullyAttachRepresentor()
+		successfullyApplyVFConfig := func(withDeps bool) {
+			if withDeps {
+				successfullyAttachRepresentor(true)
+			}
 			managerMock.On("ApplyVFConfig", pluginConf).Return(nil).Once()
 		}
-		successfullySetupVF := func() {
-			successfullyApplyVFConfig()
+		successfullySetupVF := func(withDeps bool) {
+			if withDeps {
+				successfullyApplyVFConfig(true)
+			}
 			managerMock.On("SetupVF",
 				pluginConf, testValidContIFNames, testValidContainerID, netNSMock).
 				Return(testValidMAC, nil).Once()
 		}
-		successfullyExecAdd := func() {
-			successfullySetupVF()
+		successfullyExecAdd := func(withDeps bool) {
+			if withDeps {
+				successfullySetupVF(true)
+			}
 			ipamMock.On("ExecAdd", pluginConf.IPAM.Type, cmdArgs.StdinData).
 				Return(getValidIPAMResult(), nil).Once()
 		}
-		successfullyConfigureIface := func() {
-			successfullyExecAdd()
+		successfullyConfigureIface := func(withDeps bool) {
+			if withDeps {
+				successfullyExecAdd(true)
+			}
 			ipamMock.On("ConfigureIface", cmdArgs.IfName,
 				mock.MatchedBy(func(conf *current.Result) bool {
 					return len(conf.Interfaces) > 0 && conf.Interfaces[0].Mac == testValidMAC
@@ -178,8 +190,10 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 			cacheMock.On("Save", testValidCacheRef, pluginConf).
 				Return(nil).Once()
 		}
-		successfullySave := func() {
-			successfullyConfigureIface()
+		successfullySave := func(withDeps bool) {
+			if withDeps {
+				successfullyConfigureIface(true)
+			}
 			configureCacheMock()
 		}
 		cleanupGetNS := func() {
@@ -205,24 +219,24 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 				Expect(plugin.CmdAdd(getValidCmdArgs())).To(HaveOccurred())
 			})
 			It("Failed to get NS", func() {
-				successfullyParseConfig()
+				successfullyParseConfig(true)
 				nsMock.On("GetNS", testValidNSPath).Return(nil, errTest).Once()
 				Expect(plugin.CmdAdd(cmdArgs)).To(HaveOccurred())
 			})
 			It("Failed to attach representor", func() {
-				successfullyGetNS()
+				successfullyGetNS(true)
 				managerMock.On("AttachRepresentor", pluginConf).Return(errTest).Once()
 				cleanupGetNS()
 				Expect(plugin.CmdAdd(cmdArgs)).To(HaveOccurred())
 			})
 			It("Failed to ApplyVFConfig", func() {
-				successfullyAttachRepresentor()
+				successfullyAttachRepresentor(true)
 				managerMock.On("ApplyVFConfig", pluginConf).Return(errTest).Once()
 				cleanupAttachRepresentor()
 				Expect(plugin.CmdAdd(cmdArgs)).To(HaveOccurred())
 			})
 			It("Failed to SetupVF", func() {
-				successfullyApplyVFConfig()
+				successfullyApplyVFConfig(true)
 				managerMock.On("SetupVF",
 					pluginConf, testValidContIFNames, testValidContainerID, netNSMock).
 					Return("", errTest).Once()
@@ -230,14 +244,14 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 				Expect(plugin.CmdAdd(cmdArgs)).To(HaveOccurred())
 			})
 			It("Failed to IPAM Add", func() {
-				successfullySetupVF()
+				successfullySetupVF(true)
 				ipamMock.On("ExecAdd", pluginConf.IPAM.Type, cmdArgs.StdinData).
 					Return(nil, errTest).Once()
 				cleanupSetupVFConfig()
 				Expect(plugin.CmdAdd(cmdArgs)).To(HaveOccurred())
 			})
 			It("IPAM add returns no IPs", func() {
-				successfullySetupVF()
+				successfullySetupVF(true)
 				result := getValidIPAMResult()
 				result.(*current.Result).IPs = nil
 				ipamMock.On("ExecAdd", pluginConf.IPAM.Type, cmdArgs.StdinData).
@@ -246,7 +260,7 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 				Expect(plugin.CmdAdd(cmdArgs)).To(HaveOccurred())
 			})
 			It("Failed to IPAM ConfigureIface", func() {
-				successfullyExecAdd()
+				successfullyExecAdd(true)
 				ipamMock.On("ConfigureIface", cmdArgs.IfName, mock.Anything).
 					Return(errTest).Once()
 				netNSMock.On("Do", mock.Anything).Return(func(f func(ns.NetNS) error) error {
@@ -256,7 +270,7 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 				Expect(plugin.CmdAdd(cmdArgs)).To(HaveOccurred())
 			})
 			It("Failed save cache", func() {
-				successfullyConfigureIface()
+				successfullyConfigureIface(true)
 				cacheMock.On("GetStateRef", pluginConf.Name, cmdArgs.ContainerID, cmdArgs.IfName).
 					Return(testValidCacheRef).Once()
 				cacheMock.On("Save", testValidCacheRef, pluginConf).
@@ -267,14 +281,22 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 		})
 		Context("Successful scenarios", func() {
 			It("with IPAM", func() {
-				successfullySave()
+				successfullySave(true)
 				cleanupGetNS()
 				Expect(plugin.CmdAdd(cmdArgs)).ToNot(HaveOccurred())
 			})
 			It("no IPAM", func() {
 				pluginConf.IPAM = types.IPAM{}
-				successfullySetupVF()
+				successfullySetupVF(true)
 				configureCacheMock()
+				cleanupGetNS()
+				Expect(plugin.CmdAdd(cmdArgs)).ToNot(HaveOccurred())
+			})
+			It("userspace driver", func() {
+				pluginConf.IsUserspaceDriver = true
+				successfullyApplyVFConfig(true)
+				successfullyExecAdd(false)
+				successfullySave(false)
 				cleanupGetNS()
 				Expect(plugin.CmdAdd(cmdArgs)).ToNot(HaveOccurred())
 			})
@@ -284,7 +306,7 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 			var updatedPluginConf *localtypes.PluginConf
 
 			JustBeforeEach(func() {
-				successfullyGetNS()
+				successfullyGetNS(true)
 				cleanupGetNS()
 				// workaround to access pluginConf
 				managerMock.On("AttachRepresentor", mock.Anything).Run(func(args mock.Arguments) {
