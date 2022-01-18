@@ -112,20 +112,22 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 
 	var macAddr string
-	macAddr, err = p.manager.SetupVF(pluginConf, args.IfName, args.ContainerID, cmdCtx.netNS)
-	cmdCtx.registerErrorHandler(func() {
-		netNSErr := cmdCtx.netNS.Do(func(_ ns.NetNS) error {
-			_, intErr := netlink.LinkByName(args.IfName)
-			return intErr
+	if !pluginConf.IsUserspaceDriver {
+		macAddr, err = p.manager.SetupVF(pluginConf, args.IfName, args.ContainerID, cmdCtx.netNS)
+		cmdCtx.registerErrorHandler(func() {
+			netNSErr := cmdCtx.netNS.Do(func(_ ns.NetNS) error {
+				_, intErr := netlink.LinkByName(args.IfName)
+				return intErr
+			})
+			if netNSErr == nil {
+				_ = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, cmdCtx.netNS)
+			}
 		})
-		if netNSErr == nil {
-			_ = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, cmdCtx.netNS)
-		}
-	})
 
-	if err != nil {
-		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v",
-			args.IfName, pluginConf.PFName, err)
+		if err != nil {
+			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v",
+				args.IfName, pluginConf.PFName, err)
+		}
 	}
 
 	// run the IPAM plugin
@@ -205,11 +207,13 @@ func (p *Plugin) configureIPAM(cmdCtx *cmdContext, macAddr string) error {
 		ipc.Interface = current.Int(0)
 	}
 
-	err = cmdCtx.netNS.Do(func(_ ns.NetNS) error {
-		return p.ipam.ConfigureIface(args.IfName, newResult)
-	})
-	if err != nil {
-		return err
+	if !pluginConf.IsUserspaceDriver {
+		err = cmdCtx.netNS.Do(func(_ ns.NetNS) error {
+			return p.ipam.ConfigureIface(args.IfName, newResult)
+		})
+		if err != nil {
+			return err
+		}
 	}
 	cmdCtx.result = newResult
 	return nil
@@ -283,9 +287,11 @@ func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	//nolint:gocritic
-	if err = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns); err != nil {
-		return err
+	if !pluginConf.IsUserspaceDriver {
+		//nolint:gocritic
+		if err = p.manager.ReleaseVF(pluginConf, args.IfName, args.ContainerID, netns); err != nil {
+			return err
+		}
 	}
 
 	//nolint:gocritic

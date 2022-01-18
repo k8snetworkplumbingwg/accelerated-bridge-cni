@@ -36,6 +36,10 @@ var ts = tmpSysFs{
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1/net/enp175s7",
 		"sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1",
 		"sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1d1",
+		"sys/bus/pci/devices/0000:11:00.0",
+		"sys/bus/pci/devices/0000:12:00.0",
+		"sys/bus/pci/drivers/mlx5_core",
+		"sys/bus/pci/drivers/vfio-pci",
 	},
 	fileList: map[string][]byte{
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/sriov_numvfs": []byte("2"),
@@ -66,6 +70,8 @@ var ts = tmpSysFs{
 
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/virtfn1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1",
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1/physfn":  "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1",
+		"sys/bus/pci/devices/0000:11:00.0/driver":                  "sys/bus/pci/drivers/vfio-pci",
+		"sys/bus/pci/devices/0000:12:00.0/driver":                  "sys/bus/pci/drivers/mlx5_core",
 	},
 }
 

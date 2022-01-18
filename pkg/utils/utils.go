@@ -15,6 +15,8 @@ var (
 	NetDirectory = "/sys/class/net"
 	// SysBusPci is sysfs pci device directory
 	SysBusPci = "/sys/bus/pci/devices"
+	// UserspaceDrivers is a list of driver names that don't have netlink representation for their devices
+	UserspaceDrivers = []string{"vfio-pci"}
 )
 
 // GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
@@ -111,4 +113,24 @@ func GetVFLinkName(pciAddr string) (string, error) {
 	}
 
 	return names[0], nil
+}
+
+// HasUserspaceDriver checks if a device is attached to userspace driver
+func HasUserspaceDriver(pciAddr string) (bool, error) {
+	driverLink := filepath.Join(SysBusPci, pciAddr, "driver")
+	driverPath, err := filepath.EvalSymlinks(driverLink)
+	if err != nil {
+		return false, err
+	}
+	driverStat, err := os.Stat(driverPath)
+	if err != nil {
+		return false, err
+	}
+	driverName := driverStat.Name()
+	for _, drv := range UserspaceDrivers {
+		if driverName == drv {
+			return true, nil
+		}
+	}
+	return false, nil
 }

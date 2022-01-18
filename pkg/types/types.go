@@ -42,6 +42,8 @@ type NetConf struct {
 // PluginConf is a internal representation of config options and state
 type PluginConf struct {
 	NetConf
+	// IsUserspaceDriver indicate that VF using userspace driver
+	IsUserspaceDriver bool
 	// Stores the original VF state as it was prior to any operations done during cmdAdd flow
 	OrigVfState VfState `json:"orig_vf_state"`
 	// Name of the PF to which VF belongs
