@@ -27,7 +27,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: kube-accelerated-bridge-cni
-        image: mellanox/accelerated-bridge-cni:v0.1.0
+        image: ghcr.io/k8snetworkplumbingwg/accelerated-bridge-cni:0.2.0
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
