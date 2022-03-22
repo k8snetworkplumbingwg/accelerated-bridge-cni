@@ -13,6 +13,7 @@ import (
 
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/manager/mocks"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
+	sriovMocks "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils/mocks"
 )
 
 // Fake NS - implements ns.NetNS interface
@@ -316,7 +317,7 @@ var _ = Describe("Manager", func() {
 		})
 		It("Attaching dummy link to the bridge (success)", func() {
 			mockedNl := &mocks.Netlink{}
-			mockedSr := &mocks.Sriovnet{}
+			mockedSr := &sriovMocks.Sriovnet{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
@@ -346,7 +347,7 @@ var _ = Describe("Manager", func() {
 		})
 		It("Attaching dummy link to the bridge (failure)", func() {
 			mockedNl := &mocks.Netlink{}
-			mockedSr := &mocks.Sriovnet{}
+			mockedSr := &sriovMocks.Sriovnet{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,

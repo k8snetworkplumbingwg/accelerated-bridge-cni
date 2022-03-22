@@ -9,6 +9,7 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
 )
 
 // Manager provides interface invoke sriov nic related operations
@@ -23,14 +24,14 @@ type Manager interface {
 
 type manager struct {
 	nLink Netlink
-	sriov Sriovnet
+	sriov utils.SriovnetProvider
 }
 
 // NewManager returns an instance of manager
 func NewManager() Manager {
 	return &manager{
 		nLink: &netlinkWrapper{},
-		sriov: &sriovnetWrapper{},
+		sriov: &utils.SriovnetWrapper{},
 	}
 }
 
@@ -156,9 +157,9 @@ func (m *manager) ReleaseVF(conf *types.PluginConf, podifName, cid string, netns
 
 func getVfInfo(link netlink.Link, id int) *netlink.VfInfo {
 	attrs := link.Attrs()
-	for _, vf := range attrs.Vfs {
-		if vf.ID == id {
-			return &vf
+	for i := range attrs.Vfs {
+		if attrs.Vfs[i].ID == id {
+			return &attrs.Vfs[i]
 		}
 	}
 	return nil
@@ -174,7 +175,7 @@ func (m *manager) ApplyVFConfig(conf *types.PluginConf) error {
 	// Save current the VF state before modifying it
 	vfState := getVfInfo(pfLink, conf.VFID)
 	if vfState == nil {
-		return fmt.Errorf("failed to find vf %d", conf.VFID)
+		return fmt.Errorf("failed to find vf %d for PF %s", conf.VFID, conf.PFName)
 	}
 
 	// Set mac address
