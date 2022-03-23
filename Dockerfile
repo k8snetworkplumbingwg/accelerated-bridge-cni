@@ -6,7 +6,7 @@ ENV HTTP_PROXY $http_proxy
 ENV HTTPS_PROXY $https_proxy
 
 WORKDIR /usr/src/accelerated-bridge-cni
-RUN apk add --no-cache --virtual build-dependencies build-base=~0.5 && \
+RUN apk add --no-cache --virtual build-dependencies build-base=~0.5 git && \
     make clean && \
     make build
 
