@@ -420,4 +420,39 @@ var _ = Describe("Manager", func() {
 			mocked.AssertExpectations(t)
 		})
 	})
+	Context("Checking ApplyVF function - persist original VF admin MAC", func() {
+		var (
+			netconf *types.PluginConf
+		)
+		origMac, _ := net.ParseMAC("d2:fc:22:a7:0d:e8")
+		newMac, _ := net.ParseMAC("d2:fc:22:a7:0d:e8")
+
+		BeforeEach(func() {
+			netconf = &types.PluginConf{
+				NetConf: types.NetConf{
+					DeviceID: "0000:af:06.0",
+					Vlan:     6,
+				},
+				PFName:      "enp175s0f1",
+				VFID:        3,
+				ContIFNames: "net1",
+				MAC:         newMac.String(),
+				OrigVfState: types.VfState{},
+			}
+		})
+		It("Restores original VF configurations", func() {
+			mocked := &mocks.Netlink{}
+			fakeLink := &FakeLink{netlink.LinkAttrs{Vfs: []netlink.VfInfo{{ID: 3, Mac: origMac}}}}
+
+			mocked.On("LinkByName", netconf.PFName).Return(fakeLink, nil)
+
+			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, newMac).Return(nil)
+
+			m := manager{nLink: mocked}
+			err := m.ApplyVFConfig(netconf)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+			Expect(netconf.OrigVfState.AdminMAC).To(Equal(origMac.String()))
+		})
+	})
 })

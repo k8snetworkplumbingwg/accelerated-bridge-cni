@@ -177,6 +177,8 @@ func (m *manager) ApplyVFConfig(conf *types.PluginConf) error {
 		return fmt.Errorf("failed to find vf %d", conf.VFID)
 	}
 
+	conf.OrigVfState.AdminMAC = vfState.Mac.String() // Save administrative MAC for restoring it later
+
 	// Set mac address
 	if conf.MAC != "" {
 		var hwaddr net.HardwareAddr
