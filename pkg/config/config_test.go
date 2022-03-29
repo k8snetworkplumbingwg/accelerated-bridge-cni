@@ -1,15 +1,29 @@
 package config
 
 import (
+	"fmt"
+	"strings"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
 
 	localtypes "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils/mocks"
 )
 
 var _ = Describe("Config", func() {
+	const existingVfPrefix = "0000:af:06."
+	const nonExistentVF = "0000:af:07.0"
+	const existingPF = "enp175s0f1"
 
-	conf := NewConfig()
+	mockSriovnet := &mocks.Sriovnet{}
+	mockSriovnet.On("GetUplinkRepresentor", mock.MatchedBy(func(pciAddr string) bool {
+		return strings.HasPrefix(pciAddr, existingVfPrefix)
+	})).Return(existingPF, nil)
+	mockSriovnet.On("GetUplinkRepresentor", nonExistentVF).Return("", fmt.Errorf("nonexistent VF"))
+
+	conf := Config{sriovnetProvider: mockSriovnet}
 
 	Context("Checking ParseConf function", func() {
 		It("Assuming correct config file - existing DeviceID", func() {
@@ -134,11 +148,11 @@ var _ = Describe("Config", func() {
 	})
 	Context("Checking getVfInfo function", func() {
 		It("Assuming existing PF", func() {
-			_, _, err := getVfInfo("0000:af:06.0")
+			_, _, err := conf.getVfInfo("0000:af:06.0")
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming not existing PF", func() {
-			_, _, err := getVfInfo("0000:af:07.0")
+			_, _, err := conf.getVfInfo(nonExistentVF)
 			Expect(err).To(HaveOccurred())
 		})
 	})

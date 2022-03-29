@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
-
 	localtypes "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
+	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
 )
 
 const (
@@ -20,11 +19,13 @@ type Loader interface {
 
 // NewConfig create and initialize Config struct
 func NewConfig() *Config {
-	return &Config{}
+	return &Config{sriovnetProvider: &utils.SriovnetWrapper{}}
 }
 
 // Config provides function to load and parse cni configuration
-type Config struct{}
+type Config struct {
+	sriovnetProvider utils.SriovnetProvider
+}
 
 // LoadConf load data from stdin to NetConf object
 func (c *Config) LoadConf(bytes []byte, netConf *localtypes.NetConf) error {
@@ -50,7 +51,7 @@ func (c *Config) ParseConf(bytes []byte, conf *localtypes.PluginConf) error {
 
 	// Get rest of the VF information
 	var err error
-	conf.PFName, conf.VFID, err = getVfInfo(conf.DeviceID)
+	conf.PFName, conf.VFID, err = c.getVfInfo(conf.DeviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get VF information: %q", err)
 	}
@@ -85,10 +86,10 @@ func (c *Config) ParseConf(bytes []byte, conf *localtypes.PluginConf) error {
 	return nil
 }
 
-func getVfInfo(vfPci string) (string, int, error) {
+func (c *Config) getVfInfo(vfPci string) (string, int, error) {
 	var vfID int
 
-	pf, err := utils.GetPfName(vfPci)
+	pf, err := c.sriovnetProvider.GetUplinkRepresentor(vfPci)
 	if err != nil {
 		return "", vfID, err
 	}

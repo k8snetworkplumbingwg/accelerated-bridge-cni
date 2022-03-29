@@ -71,26 +71,6 @@ func GetVfid(addr, pfName string) (int, error) {
 	return id, fmt.Errorf("unable to get VF ID with PF: %s and VF pci address %v", pfName, addr)
 }
 
-// GetPfName returns PF net device name of a given VF pci address
-func GetPfName(vf string) (string, error) {
-	pfSymLink := filepath.Join(SysBusPci, vf, "physfn", "net")
-	_, err := os.Lstat(pfSymLink)
-	if err != nil {
-		return "", err
-	}
-
-	files, err := ioutil.ReadDir(pfSymLink)
-	if err != nil {
-		return "", err
-	}
-
-	if len(files) < 1 {
-		return "", fmt.Errorf("PF network device not found")
-	}
-
-	return strings.TrimSpace(files[0].Name()), nil
-}
-
 // GetVFLinkName returns VF's network interface name given it's PCI addr
 func GetVFLinkName(pciAddr string) (string, error) {
 	vfDir := filepath.Join(SysBusPci, pciAddr, "net")
