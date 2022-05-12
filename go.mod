@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/Mellanox/sriovnet v1.1.0
-	github.com/containernetworking/cni v0.8.0
+	github.com/containernetworking/cni v0.8.1
 	github.com/containernetworking/plugins v0.8.7
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
