@@ -12,6 +12,7 @@ The Accelerated Bridge CNI configures networks through a CNI spec configuration 
 * `bridge` (string, optional): Linux Bridge to use. e.g. `br1`, default value is `cni0`
 * `vlan` (int, optional): VLAN ID to assign for the VF. Value must be in the range 0-4094 (0 for disabled, 1-4094 for valid VLAN IDs).
 * `mac` (string, optional): MAC address to assign for the VF
+* `mtu` (int, optional): MTU configuration for the VF.
 * `trunk` (array, optional): VLAN trunk configuration for the VF. 
   Value must be an array of objects with trunk config, e.g.
   `[{"id": 42}, {"minID": 100, "maxID": 105}, {"id": 198, "minID": 200, "maxID": 210}]`,
@@ -55,6 +56,7 @@ An Accelerated Bridge CNI config with each field filled out looks like:
     "deviceID": "0000:03:02.0",
     "mac": "CA:FE:C0:FF:EE:00",
     "vlan": 1000,
+    "mtu": 2000,
     "trunk": [{"minID": 100, "maxID": 105}],
     "runtimeConfig": {
       "mac": "CA:FE:C0:FF:EE:11"

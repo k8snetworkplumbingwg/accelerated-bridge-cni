@@ -148,6 +148,29 @@ var _ = Describe("Manager", func() {
 			Expect(macAddr).To(Equal(netconf.MAC))
 			mocked.AssertExpectations(t)
 		})
+		It("Setting mtu", func() {
+			targetNetNS := newFakeNs()
+			mocked := &mocks.Netlink{}
+			netconf.MTU = 2000
+			origMTU := 1500
+			fakeLink := &FakeLink{netlink.LinkAttrs{
+				Index: 1000,
+				Name:  "dummylink",
+				MTU:   origMTU,
+			}}
+
+			mocked.On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, netconf.MTU).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", fakeLink).Return(nil)
+			m := manager{nLink: mocked}
+			_, err := m.SetupVF(netconf, podifName, contID, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(netconf.OrigVfState.MTU).To(Equal(origMTU))
+			mocked.AssertExpectations(t)
+		})
 	})
 
 	Context("Checking ReleaseVF function", func() {
@@ -189,14 +212,18 @@ var _ = Describe("Manager", func() {
 	})
 	Context("Checking ReleaseVF function - restore config", func() {
 		var (
-			podifName string
-			contID    string
-			netconf   *types.PluginConf
+			podifName  string
+			contID     string
+			netconf    *types.PluginConf
+			origMTU    int
+			hostIFName string
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
 			contID = "dummycid"
+			origMTU = 1500
+			hostIFName = "enp175s6"
 			netconf = &types.PluginConf{
 				NetConf: types.NetConf{
 					DeviceID: "0000:af:06.0",
@@ -204,14 +231,16 @@ var _ = Describe("Manager", func() {
 				PFName:      "enp175s0f1",
 				VFID:        0,
 				MAC:         "aa:f3:8d:65:1b:d4",
+				MTU:         1600,
 				ContIFNames: "net1",
 				OrigVfState: types.VfState{
-					HostIFName:   "enp175s6",
+					HostIFName:   hostIFName,
 					EffectiveMAC: "c6:c8:7f:1f:21:90",
+					MTU:          origMTU,
 				},
 			}
 		})
-		It("Restores Effective MAC address when provided in netconf", func() {
+		It("Restores Effective MAC address and MTU when provided in netconf", func() {
 			targetNetNS := newFakeNs()
 			mocked := &mocks.Netlink{}
 			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
@@ -220,6 +249,7 @@ var _ = Describe("Manager", func() {
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, origMTU).Return(nil)
 			origEffMac, err := net.ParseMAC(netconf.OrigVfState.EffectiveMAC)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.On("LinkSetHardwareAddr", fakeLink, origEffMac).Return(nil)
@@ -316,12 +346,16 @@ var _ = Describe("Manager", func() {
 			zerolog.SetGlobalLevel(zerolog.Disabled)
 		})
 		It("Attaching dummy link to the bridge (success)", func() {
+			origMtu := 1500
+			newMtu := 2000
+			netconf.MTU = newMtu
 			mockedNl := &mocks.Netlink{}
 			mockedSr := &sriovMocks.Sriovnet{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
 				MasterIndex: 0,
+				MTU:         origMtu,
 			}}
 
 			mockedNl.On("LinkByName", netconf.Bridge).Return(fakeBridge, nil)
@@ -337,6 +371,7 @@ var _ = Describe("Manager", func() {
 			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(100), true, true, false, true).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(4), false, false, false, true).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeLink, uint16(6), false, false, false, true).Return(nil)
+			mockedNl.On("LinkSetMTU", fakeLink, newMtu).Return(nil)
 
 			m := manager{nLink: mockedNl, sriov: mockedSr}
 			err := m.AttachRepresentor(netconf)
@@ -344,6 +379,7 @@ var _ = Describe("Manager", func() {
 			Expect(fakeLink.Attrs().MasterIndex).To(Equal(fakeBridge.Attrs().Index))
 			mockedNl.AssertExpectations(t)
 			mockedSr.AssertExpectations(t)
+			Expect(netconf.OrigRepState.MTU).To(Equal(origMtu))
 		})
 		It("Attaching dummy link to the bridge (failure)", func() {
 			mockedNl := &mocks.Netlink{}
@@ -371,6 +407,8 @@ var _ = Describe("Manager", func() {
 		var (
 			netconf *types.PluginConf
 		)
+		origMtu := 1500
+		newMtu := 2000
 
 		BeforeEach(func() {
 			netconf = &types.PluginConf{
@@ -380,6 +418,10 @@ var _ = Describe("Manager", func() {
 				Representor: "dummylink",
 				PFName:      "enp175s0f1",
 				VFID:        0,
+				MTU:         newMtu,
+				OrigRepState: types.RepState{
+					MTU: origMtu,
+				},
 			}
 			// Mute logger
 			zerolog.SetGlobalLevel(zerolog.Disabled)
@@ -397,6 +439,7 @@ var _ = Describe("Manager", func() {
 				link := args.Get(0).(netlink.Link)
 				link.Attrs().MasterIndex = 0
 			}).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, origMtu).Return(nil)
 
 			m := manager{nLink: mocked}
 			err := m.DetachRepresentor(netconf)
@@ -413,6 +456,7 @@ var _ = Describe("Manager", func() {
 
 			mocked.On("LinkByName", netconf.Representor).Return(fakeLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, origMtu).Return(nil)
 			mocked.On("LinkSetNoMaster", fakeLink).Return(errors.New("some error"))
 
 			m := manager{nLink: mocked}

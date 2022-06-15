@@ -48,21 +48,21 @@ func (m *manager) SetupVF(conf *types.PluginConf, podifName, cid string, netns n
 	tempName := fmt.Sprintf("%s%d", "temp_", linkObj.Attrs().Index)
 
 	// 1. Set link down
-	if err := m.nLink.LinkSetDown(linkObj); err != nil {
+	if err = m.nLink.LinkSetDown(linkObj); err != nil {
 		return "", fmt.Errorf("failed to down vf device %q: %v", linkName, err)
 	}
 
 	// 2. Set temp name
-	if err := m.nLink.LinkSetName(linkObj, tempName); err != nil {
+	if err = m.nLink.LinkSetName(linkObj, tempName); err != nil {
 		return "", fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
 	}
 
 	macAddress := linkObj.Attrs().HardwareAddr.String()
 	// 3. Set MAC address
 	if conf.MAC != "" {
-		hwaddr, err := net.ParseMAC(conf.MAC)
+		hwaddr, err1 := net.ParseMAC(conf.MAC)
 		macAddress = conf.MAC
-		if err != nil {
+		if err1 != nil {
 			return "", fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
 		}
 
@@ -74,18 +74,28 @@ func (m *manager) SetupVF(conf *types.PluginConf, podifName, cid string, netns n
 		}
 	}
 
-	// 4. Change netns
+	// 4. Set MTU
+	if conf.MTU != 0 {
+		prevMTU := linkObj.Attrs().MTU
+		if err = m.nLink.LinkSetMTU(linkObj, conf.MTU); err != nil {
+			return "", fmt.Errorf("failed to set MTU on VF %s: %v", linkObj.Attrs().Name, err)
+		}
+		log.Info().Msgf("VF link %s MTU set to %d", linkObj.Attrs().Name, conf.MTU)
+		conf.OrigVfState.MTU = prevMTU
+	}
+
+	// 5. Change netns
 	if err := m.nLink.LinkSetNsFd(linkObj, int(netns.Fd())); err != nil {
 		return "", fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
 	}
 
 	if err := netns.Do(func(_ ns.NetNS) error {
-		// 5. Set Pod IF name
+		// 6. Set Pod IF name
 		if err := m.nLink.LinkSetName(linkObj, podifName); err != nil {
 			return fmt.Errorf("error setting container interface name %s for %s", linkName, tempName)
 		}
 
-		// 6. Bring IF up in Pod netns
+		// 7. Bring IF up in Pod netns
 		if err := m.nLink.LinkSetUp(linkObj); err != nil {
 			return fmt.Errorf("error bringing interface up in container ns: %q", err)
 		}
@@ -143,6 +153,14 @@ func (m *manager) ReleaseVF(conf *types.PluginConf, podifName, cid string, netns
 				return fmt.Errorf("failed to restore original effective netlink MAC address %s: %v",
 					hwaddr, err)
 			}
+		}
+
+		// reset MTU
+		if conf.MTU != 0 {
+			if err = m.nLink.LinkSetMTU(linkObj, conf.OrigVfState.MTU); err != nil {
+				return fmt.Errorf("failed to set MTU on VF %s: %v", linkObj.Attrs().Name, err)
+			}
+			log.Info().Msgf("VF link %s MTU set to %d", linkObj.Attrs().Name, conf.OrigVfState.MTU)
 		}
 
 		// move VF device to init netns
@@ -235,6 +253,14 @@ func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 		return fmt.Errorf("failed to get representor link %s: %v", conf.Representor, err)
 	}
 
+	if conf.MTU != 0 {
+		conf.OrigRepState.MTU = rep.Attrs().MTU
+		if err = m.nLink.LinkSetMTU(rep, conf.MTU); err != nil {
+			return fmt.Errorf("failed to set MTU on representor %s: %v", conf.Representor, err)
+		}
+		log.Info().Msgf("Setting MTU %d on rep %s to the bridge %s", conf.MTU, conf.Representor, conf.Bridge)
+	}
+
 	if err = m.nLink.LinkSetUp(rep); err != nil {
 		return fmt.Errorf("failed to set representor %s up: %v", conf.Representor, err)
 	}
@@ -282,6 +308,14 @@ func (m *manager) DetachRepresentor(conf *types.PluginConf) error {
 
 	if err = m.nLink.LinkSetDown(rep); err != nil {
 		return fmt.Errorf("failed to set representor %s down: %v", conf.Representor, err)
+	}
+
+	// Restore MTU
+	if conf.MTU != 0 {
+		if err = m.nLink.LinkSetMTU(rep, conf.OrigRepState.MTU); err != nil {
+			return fmt.Errorf("failed to set MTU on rep %s: %v", conf.Representor, err)
+		}
+		log.Info().Msgf("Restoring MTU %d on rep %s", conf.OrigRepState.MTU, conf.Representor)
 	}
 
 	log.Info().Msgf("Detaching rep %s from the bridge %s", conf.Representor, conf.Bridge)
