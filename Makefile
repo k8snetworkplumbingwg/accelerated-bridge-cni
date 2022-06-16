@@ -74,6 +74,23 @@ GOVERALLS = $(GOBIN)/goveralls
 $(GOBIN)/goveralls: | $(BASE) ; $(info  building goveralls...)
 	$Q env GO111MODULE=off go get github.com/mattn/goveralls
 
+MOCKERY = $(shell pwd)/bin/mockery
+mockery: ## Download mockery if necessary.
+	$(call go-get-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.8.0)
+
+# go-get-tool will 'go get' any package $2 and install it to $1.
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+define go-get-tool
+@[ -f $(1) ] || { \
+set -e ;\
+TMP_DIR=$$(mktemp -d) ;\
+cd $$TMP_DIR ;\
+go mod init tmp ;\
+echo "Downloading $(2)" ;\
+GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+rm -rf $$TMP_DIR ;\
+}
+endef
 
 # Tests
 TEST_TARGETS := test-default test-bench test-short test-verbose test-race
