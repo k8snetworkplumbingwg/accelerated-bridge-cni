@@ -76,6 +76,7 @@ var ts = tmpSysFs{
 }
 
 // CreateTmpSysFs create mock sysfs for testing
+// nolint:gosec
 func CreateTmpSysFs() error {
 	tmpdir, err := ioutil.TempDir("/tmp", "accelerated-bridge-testfiles-")
 	if err != nil {
@@ -90,7 +91,7 @@ func CreateTmpSysFs() error {
 		}
 	}
 	for filename, body := range ts.fileList {
-		if err := ioutil.WriteFile(filepath.Join(ts.dirRoot, filename), body, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(ts.dirRoot, filename), body, 0644); err != nil {
 			return err
 		}
 	}

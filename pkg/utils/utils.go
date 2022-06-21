@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -28,7 +27,7 @@ func GetSriovNumVfs(ifName string) (int, error) {
 		return vfTotal, fmt.Errorf("failed to open the sriov_numfs of device %q: %v", ifName, err)
 	}
 
-	data, err := ioutil.ReadFile(sriovFile)
+	data, err := os.ReadFile(sriovFile)
 	if err != nil {
 		return vfTotal, fmt.Errorf("failed to read the sriov_numfs of device %q: %v", ifName, err)
 	}
@@ -78,7 +77,7 @@ func GetVFLinkName(pciAddr string) (string, error) {
 		return "", err
 	}
 
-	fInfos, err := ioutil.ReadDir(vfDir)
+	fInfos, err := os.ReadDir(vfDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read net dir of the device %s: %v", pciAddr, err)
 	}
