@@ -9,11 +9,11 @@ jobs:
       contents: read
     steps:
       - name: Set up Go 1.x
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: ^1.15
+          go-version: 1.18
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: lint
         run: make lint
       - name: build
@@ -29,6 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: image
         run: make image

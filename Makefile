@@ -41,7 +41,7 @@ GOLANGCI_LINT   = $(GOBIN)/golangci-lint
 # golangci-lint version should be updated periodically
 # we keep it fixed to avoid it from unexpectedly failing on the project
 # in case of a version bump
-GOLANGCI_LINT_VER = v1.23.8
+GOLANGCI_LINT_VER = v1.46.2
 TIMEOUT         = 15
 V               = 0
 Q               = $(if $(filter 1,$V),,@)
@@ -67,12 +67,12 @@ $(BUILDDIR)/$(BINARY_NAME): $(GOFILES) | $(BUILDDIR)
 
 
 # Tools
-$(GOLANGCI_LINT): | $(BASE) ; $(info  building golangci-lint...)
-	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_LINT_VER)
+$(GOLANGCI_LINT): | $(BASE) ; $(info  installing golangci-lint...)
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VER))
 
 GOVERALLS = $(GOBIN)/goveralls
-$(GOBIN)/goveralls: | $(BASE) ; $(info  building goveralls...)
-	$Q env GO111MODULE=off go get github.com/mattn/goveralls
+$(GOVERALLS): | $(BASE) ; $(info  installing goveralls...)
+	$(call go-install-tool,$(GOVERALLS),github.com/mattn/goveralls@latest)
 
 
 # Tests
@@ -132,3 +132,12 @@ clean: ; $(info  Cleaning...)	@ ## Cleanup everything
 help: ## Show this message
 	@grep -E '^[ a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+# go-install-tool will 'go install' any package $2 and install it to $1.
+define go-install-tool
+@[ -f $(1) ] || { \
+echo "Downloading $(2)" ;\
+go install $(2) ;\
+}
+endef
+
