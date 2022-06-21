@@ -3,16 +3,11 @@ BINARY_NAME     = accelerated-bridge
 PACKAGE         = accelerated-bridge-cni
 ORG_PATH        = github.com/k8snetworkplumbingwg
 REPO_PATH       = $(ORG_PATH)/$(PACKAGE)
-GOPATH          = $(CURDIR)/.gopath
-GOBIN           = $(CURDIR)/bin
+BINDIR          = $(CURDIR)/bin
 BUILDDIR        = $(CURDIR)/build
-BASE            = $(GOPATH)/src/$(REPO_PATH)
 GOFILES         = $(shell find . -name *.go | grep -vE "(\/vendor\/)|(_test.go)")
-PKGS            = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/"))
-TESTPKGS        = $(shell env GOPATH=$(GOPATH) $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
-
-export GOPATH
-export GOBIN
+PKGS            = $(or $(PKG),$(shell $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/"))
+TESTPKGS        = $(shell $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
 
 # Version
 VERSION?        = master
@@ -22,7 +17,7 @@ LDFLAGS         = "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.d
 
 # Docker
 IMAGE_BUILDER  ?= @docker
-IMAGEDIR        = $(BASE)/images
+IMAGEDIR        = $(CURDIR)/images
 DOCKERFILE      = $(CURDIR)/Dockerfile
 TAG             = mellanox/accelerated-bridge-cni
 # Accept proxy settings for docker
@@ -37,7 +32,7 @@ endif
 
 # Go tools
 GO              = go
-GOLANGCI_LINT   = $(GOBIN)/golangci-lint
+GOLANGCI_LINT   = $(BINDIR)/golangci-lint
 # golangci-lint version should be updated periodically
 # we keep it fixed to avoid it from unexpectedly failing on the project
 # in case of a version bump
@@ -49,31 +44,25 @@ Q               = $(if $(filter 1,$V),,@)
 .PHONY: all
 all: lint build test-coverage
 
-$(BASE): ; $(info  setting GOPATH...)
-	@mkdir -p $(dir $@)
-	@ln -sf $(CURDIR) $@
-
-$(GOBIN):
+$(BINDIR):
 	@mkdir -p $@
 
-$(BUILDDIR): | $(BASE) ; $(info Creating build directory...)
-	@cd $(BASE) && mkdir -p $@
+$(BUILDDIR): | ; $(info Creating build directory...)
+	@mkdir -p $@
 
 build: $(BUILDDIR)/$(BINARY_NAME) ; $(info Building $(BINARY_NAME)...) ## Build executable file
 	$(info Done!)
 
 $(BUILDDIR)/$(BINARY_NAME): $(GOFILES) | $(BUILDDIR)
-	@cd $(BASE)/cmd/$(BINARY_NAME) && CGO_ENABLED=0 $(GO) build -o $(BUILDDIR)/$(BINARY_NAME) -tags no_openssl -ldflags $(LDFLAGS) -v
-
+	@cd cmd/$(BINARY_NAME) && CGO_ENABLED=0 $(GO) build -o $(BUILDDIR)/$(BINARY_NAME) -tags no_openssl -ldflags $(LDFLAGS) -v
 
 # Tools
 $(GOLANGCI_LINT): | $(BASE) ; $(info  installing golangci-lint...)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VER))
 
-GOVERALLS = $(GOBIN)/goveralls
+GOVERALLS = $(BINDIR)/goveralls
 $(GOVERALLS): | $(BASE) ; $(info  installing goveralls...)
 	$(call go-install-tool,$(GOVERALLS),github.com/mattn/goveralls@latest)
-
 
 # Tests
 TEST_TARGETS := test-default test-bench test-short test-verbose test-race
@@ -85,17 +74,17 @@ test-race:    ARGS=-race         ## Run tests with race detector
 $(TEST_TARGETS): NAME=$(MAKECMDGOALS:test-%=%)
 $(TEST_TARGETS): test
 check test tests: lint | $(BASE) ; $(info  running $(NAME:%=% )tests...) @ ## Run tests
-	$Q cd $(BASE) && $(GO) test -timeout $(TIMEOUT)s $(ARGS) $(TESTPKGS)
+	$Q $(GO) test -timeout $(TIMEOUT)s $(ARGS) $(TESTPKGS)
 
 test-xml: lint | $(BASE) $(GO2XUNIT) ; $(info  running $(NAME:%=% )tests...) @ ## Run tests with xUnit output
-	$Q cd $(BASE) && 2>&1 $(GO) test -timeout 20s -v $(TESTPKGS) | tee test/tests.output
+	$Q 2>&1 $(GO) test -timeout 20s -v $(TESTPKGS) | tee test/tests.output
 	$(GO2XUNIT) -fail -input test/tests.output -output test/tests.xml
 
 COVERAGE_MODE = count
 COVER_PROFILE = accelerated-bridge.cover
 test-coverage-tools: | $(GOVERALLS)
 test-coverage: test-coverage-tools | $(BASE) ; $(info  running coverage tests...) @ ## Run coverage tests
-	$Q cd $(BASE); $(GO) test -covermode=$(COVERAGE_MODE) -coverprofile=$(COVER_PROFILE) ./...
+	$Q $(GO) test -covermode=$(COVERAGE_MODE) -coverprofile=$(COVER_PROFILE) ./...
 
 .PHONY: upload-coverage
 upload-coverage: test-coverage-tools | $(BASE) ; $(info  uploading coverage results...) @ ## Upload coverage report
@@ -103,11 +92,7 @@ upload-coverage: test-coverage-tools | $(BASE) ; $(info  uploading coverage resu
 
 .PHONY: lint
 lint: | $(BASE) $(GOLANGCI_LINT) ; $(info  running golangci-lint...) @ ## Run golangci-lint
-	$Q mkdir -p $(BASE)/test
-	$Q cd $(BASE) && ret=0 && \
-		test -z "$$($(GOLANGCI_LINT) run | tee $(BASE)/test/lint.out)" || ret=1 ; \
-		cat $(BASE)/test/lint.out ; rm -rf $(BASE)/test ; \
-	 exit $$ret
+	$Q $(GOLANGCI_LINT) run --timeout=10m
 
 # Docker image
 .PHONY: image
@@ -117,16 +102,14 @@ image: | $(BASE) ; $(info Building Docker image...)
 # Dependency management
 .PHONY: deps-update
 deps-update: ; $(info  updating dependencies...)
-	@$(GO) mod tidy && $(GO) mod vendor
+	@$(GO) mod tidy
 
 # Misc
 .PHONY: clean
 clean: ; $(info  Cleaning...)	@ ## Cleanup everything
-	@$(GO) clean -modcache
-	@rm -rf $(GOPATH)
 	@rm -rf $(BUILDDIR)
 	@rm -rf test
-	@rm -rf bin
+	@rm -rf $(BINDIR)
 
 .PHONY: help
 help: ## Show this message
@@ -137,7 +120,7 @@ help: ## Show this message
 define go-install-tool
 @[ -f $(1) ] || { \
 echo "Downloading $(2)" ;\
-go install $(2) ;\
+GOBIN=$(BINDIR) go install $(2) ;\
 }
 endef
 
