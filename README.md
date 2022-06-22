@@ -35,7 +35,7 @@ If CNI plugin detects that VF bounded to a userspace driver, it will skip step w
 
 ## Build
 
-This plugin uses Go modules for dependency management and requires Go 1.13+ to build.
+This plugin uses Go modules for dependency management and requires Go 1.18 to build.
 
 To build the plugin binary:
 
