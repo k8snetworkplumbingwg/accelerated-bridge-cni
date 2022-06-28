@@ -9,6 +9,12 @@ type VfState struct {
 	HostIFName   string `json:"host_if_name"`
 	AdminMAC     string `json:"admin_mac"`
 	EffectiveMAC string `json:"effective_mac"`
+	MTU          int    `json:"mtu"`
+}
+
+// RepState represents the state of the Representor
+type RepState struct {
+	MTU int `json:"mtu"`
 }
 
 // Trunk represents configuration options for VLAN trunk
@@ -32,6 +38,8 @@ type NetConf struct {
 	Trunk []Trunk `json:"trunk"`
 	// MAC as top level config option; required for CNIs that don't support runtimeConfig
 	MAC string `json:"mac,omitempty"`
+	// MTU for VF and representor
+	MTU int `json:"mtu"`
 	// PCI address of a VF in valid sysfs format
 	DeviceID      string `json:"deviceID"`
 	RuntimeConfig struct {
@@ -46,10 +54,14 @@ type PluginConf struct {
 	IsUserspaceDriver bool
 	// Stores the original VF state as it was prior to any operations done during cmdAdd flow
 	OrigVfState VfState `json:"orig_vf_state"`
+	// Stores the original Representor state as it was prior to any operations done during cmdAdd flow
+	OrigRepState RepState `json:"orig_rep_state"`
 	// Name of the PF to which VF belongs
 	PFName string `json:"pf_name"`
 	// MAC which should be set for VF
 	MAC string `json:"mac"`
+	// MTU for VF and representor
+	MTU int `json:"mtu"`
 	// VF's representor attached to the bridge; used during deletion
 	Representor string `json:"representor"`
 	// VF index

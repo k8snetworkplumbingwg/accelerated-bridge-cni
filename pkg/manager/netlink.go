@@ -19,6 +19,7 @@ type Netlink interface {
 	LinkSetNoMaster(netlink.Link) error
 	BridgeVlanAdd(netlink.Link, uint16, bool, bool, bool, bool) error
 	BridgeVlanDel(netlink.Link, uint16, bool, bool, bool, bool) error
+	LinkSetMTU(netlink.Link, int) error
 }
 
 // netlinkWrapper wrapper for netlink package
@@ -38,6 +39,11 @@ func (n *netlinkWrapper) LinkSetVfHardwareAddr(link netlink.Link, vf int, hwaddr
 // LinkSetHardwareAddr is a wrapper for netlink.LinkSetHardwareAddr
 func (n *netlinkWrapper) LinkSetHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
 	return netlink.LinkSetHardwareAddr(link, hwaddr)
+}
+
+// LinkSetMTU is a wrapper for netlink.LinkSetMTU
+func (n *netlinkWrapper) LinkSetMTU(link netlink.Link, mtu int) error {
+	return netlink.LinkSetMTU(link, mtu)
 }
 
 // LinkSetUp is a wrapper for netlink.LinkSetUp

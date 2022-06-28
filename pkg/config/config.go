@@ -43,6 +43,7 @@ func (c *Config) ParseConf(bytes []byte, conf *localtypes.PluginConf) error {
 	}
 
 	conf.MAC = conf.NetConf.MAC
+	conf.MTU = conf.NetConf.MTU
 
 	// DeviceID takes precedence; if we are given a VF pciaddr then work from there
 	if conf.DeviceID == "" {
