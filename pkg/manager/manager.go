@@ -23,14 +23,14 @@ type Manager interface {
 }
 
 type manager struct {
-	nLink Netlink
+	nLink utils.Netlink
 	sriov utils.SriovnetProvider
 }
 
 // NewManager returns an instance of manager
 func NewManager() Manager {
 	return &manager{
-		nLink: &netlinkWrapper{},
+		nLink: &utils.NetlinkWrapper{},
 		sriov: &utils.SriovnetWrapper{},
 	}
 }
@@ -280,19 +280,19 @@ func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 	// if VF has any VLAN config we should remove default vlan on port
 	// if VLAN 1 explicitly requested we should not remove it from the port
 	if conf.Vlan > 1 || len(conf.Trunk) > 0 {
-		if err = bridgePVIDVlanDel(m.nLink, rep, 1); err != nil {
+		if err = utils.BridgePVIDVlanDel(m.nLink, rep, 1); err != nil {
 			return fmt.Errorf("failed to remove default VLAN(1) for representor %s: %v", conf.Representor, err)
 		}
 	}
 
 	if len(conf.Trunk) > 0 {
-		if err = bridgeTrunkVlanAdd(m.nLink, rep, conf.Trunk); err != nil {
+		if err = utils.BridgeTrunkVlanAdd(m.nLink, rep, conf.Trunk); err != nil {
 			return fmt.Errorf("failed to add trunk VLAN for representor %s: %v", conf.Representor, err)
 		}
 	}
 
 	if conf.Vlan > 0 {
-		if err = bridgePVIDVlanAdd(m.nLink, rep, conf.Vlan); err != nil {
+		if err = utils.BridgePVIDVlanAdd(m.nLink, rep, conf.Vlan); err != nil {
 			return fmt.Errorf("failed to set VLAN for representor %s: %v", conf.Representor, err)
 		}
 	}
