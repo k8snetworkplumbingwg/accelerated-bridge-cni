@@ -238,9 +238,9 @@ func (m *manager) ResetVFConfig(conf *types.PluginConf) error {
 }
 
 func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
-	bridge, err := m.nLink.LinkByName(conf.Bridge)
+	bridge, err := m.nLink.LinkByName(conf.ActualBridge)
 	if err != nil {
-		return fmt.Errorf("failed to get bridge link %s: %v", conf.Bridge, err)
+		return fmt.Errorf("failed to get bridge link %s: %v", conf.ActualBridge, err)
 	}
 
 	conf.Representor, err = m.sriov.GetVfRepresentor(conf.PFName, conf.VFID)
@@ -258,14 +258,14 @@ func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 		if err = m.nLink.LinkSetMTU(rep, conf.MTU); err != nil {
 			return fmt.Errorf("failed to set MTU on representor %s: %v", conf.Representor, err)
 		}
-		log.Info().Msgf("Setting MTU %d on rep %s to the bridge %s", conf.MTU, conf.Representor, conf.Bridge)
+		log.Info().Msgf("Setting MTU %d on rep %s to the bridge %s", conf.MTU, conf.Representor, conf.ActualBridge)
 	}
 
 	if err = m.nLink.LinkSetUp(rep); err != nil {
 		return fmt.Errorf("failed to set representor %s up: %v", conf.Representor, err)
 	}
 
-	log.Info().Msgf("Attaching rep %s to the bridge %s", conf.Representor, conf.Bridge)
+	log.Info().Msgf("Attaching rep %s to the bridge %s", conf.Representor, conf.ActualBridge)
 
 	if err = m.nLink.LinkSetMaster(rep, bridge); err != nil {
 		return fmt.Errorf("failed to add representor %s to bridge: %v", conf.Representor, err)
@@ -318,6 +318,6 @@ func (m *manager) DetachRepresentor(conf *types.PluginConf) error {
 		log.Info().Msgf("Restoring MTU %d on rep %s", conf.OrigRepState.MTU, conf.Representor)
 	}
 
-	log.Info().Msgf("Detaching rep %s from the bridge %s", conf.Representor, conf.Bridge)
+	log.Info().Msgf("Detaching rep %s from the bridge %s", conf.Representor, conf.ActualBridge)
 	return m.nLink.LinkSetNoMaster(rep)
 }

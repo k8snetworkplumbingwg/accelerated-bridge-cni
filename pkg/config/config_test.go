@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
+	"github.com/vishvananda/netlink"
 
 	localtypes "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils/mocks"
@@ -23,7 +24,12 @@ var _ = Describe("Config", func() {
 	})).Return(existingPF, nil)
 	mockSriovnet.On("GetUplinkRepresentor", nonExistentVF).Return("", fmt.Errorf("nonexistent VF"))
 
-	conf := Config{sriovnetProvider: mockSriovnet}
+	mockNetlink := &mocks.Netlink{}
+	mockNetlink.On("LinkByName", mock.Anything).Return(
+		&netlink.Device{LinkAttrs: netlink.LinkAttrs{Name: existingPF, MasterIndex: 2}}, nil)
+	mockNetlink.On("LinkByIndex", 2).Return(
+		&netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: "cni0"}}, nil)
+	conf := Config{sriovnetProvider: mockSriovnet, netlink: mockNetlink}
 
 	Context("Checking ParseConf function", func() {
 		It("Assuming correct config file - existing DeviceID", func() {
@@ -95,6 +101,57 @@ var _ = Describe("Config", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg.Trunk).To(BeEquivalentTo([]int{5, 19, 20, 21, 22, 23, 55, 101, 102, 103}))
 
+	})
+	It("Assuming correct config file - static bridge config", func() {
+		data := []byte(`{
+		"name": "mynet",
+		"type": "accelerated-bridge",
+		"deviceID": "0000:af:06.1",
+		"bridge": "bridge1, bridge2"
+		}`)
+		mockNetlink := &mocks.Netlink{}
+		mockNetlink.On("LinkByName", mock.Anything).Return(
+			&netlink.Device{LinkAttrs: netlink.LinkAttrs{Name: existingPF, MasterIndex: 2}}, nil)
+		mockNetlink.On("LinkByIndex", 2).Return(
+			&netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: "bridge2"}}, nil)
+		conf := &Config{sriovnetProvider: mockSriovnet, netlink: mockNetlink}
+		cfg := &localtypes.PluginConf{}
+		err := conf.ParseConf(data, cfg)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg.ActualBridge).To(BeEquivalentTo("bridge2"))
+	})
+	It("Assuming incorrect config file - uplink attached to invalid bridge", func() {
+		data := []byte(`{
+		"name": "mynet",
+		"type": "accelerated-bridge",
+		"deviceID": "0000:af:06.1",
+		"bridge": "foo,bridge1"
+		}`)
+		cfg := &localtypes.PluginConf{}
+		err := conf.ParseConf(data, cfg)
+		Expect(err).To(HaveOccurred())
+	})
+	It("Assuming incorrect config file - invalid format for bridge option", func() {
+		data := []byte(`{
+		"name": "mynet",
+		"type": "accelerated-bridge",
+		"deviceID": "0000:af:06.1",
+		"bridge": ", , "
+		}`)
+		cfg := &localtypes.PluginConf{}
+		err := conf.ParseConf(data, cfg)
+		Expect(err).To(HaveOccurred())
+	})
+	It("Assuming incorrect config file - invalid format for bridge option 2", func() {
+		data := []byte(`{
+		"name": "mynet",
+		"type": "accelerated-bridge",
+		"deviceID": "0000:af:06.1",
+		"bridge": "foo,,"
+		}`)
+		cfg := &localtypes.PluginConf{}
+		err := conf.ParseConf(data, cfg)
+		Expect(err).To(HaveOccurred())
 	})
 	It("Assuming incorrect config file - negative vlan ID", func() {
 		data := []byte(`{

@@ -59,11 +59,12 @@ func getValidPluginConf() *localtypes.PluginConf {
 			Vlan:     testValidVlan,
 			Trunk:    testValidTrunk,
 		},
-		Trunk:       testValidTrunkInt,
-		PFName:      testValidPFName,
-		ContIFNames: testValidContIFNames,
-		VFID:        testValidVFID,
-		Representor: testValidRepName,
+		Trunk:        testValidTrunkInt,
+		PFName:       testValidPFName,
+		ActualBridge: testValidBridge,
+		ContIFNames:  testValidContIFNames,
+		VFID:         testValidVFID,
+		Representor:  testValidRepName,
 	}
 }
 

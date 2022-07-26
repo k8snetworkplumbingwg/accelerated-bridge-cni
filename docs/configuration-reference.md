@@ -9,7 +9,8 @@ The Accelerated Bridge CNI configures networks through a CNI spec configuration 
 * `ipam` (dictionary, optional): IPAM configuration to be used for this network.
 * `deviceID` (string, required): A valid pci address of a SWITCHDEV NIC's VF. e.g. "0000:03:02.3".
 * `debug` (bool, optional): Enable verbose logging
-* `bridge` (string, optional): Linux Bridge to use. e.g. `br1`, default value is `cni0`
+* `bridge` (string, optional): single or comma separated list of linux bridges to use e.g. `br1` or `br1, br2`, default value is `cni0`.
+  CNI will use automatic bridge selection logic if multiple bridges are set.
 * `vlan` (int, optional): VLAN ID to assign for the VF. Value must be in the range 0-4094 (0 for disabled, 1-4094 for valid VLAN IDs).
 * `mac` (string, optional): MAC address to assign for the VF
 * `mtu` (int, optional): MTU configuration for the VF.
@@ -52,7 +53,7 @@ An Accelerated Bridge CNI config with each field filled out looks like:
       "gateway": "10.56.217.1"
     },
     "debug": true,
-    "bridge": "br1",
+    "bridge": "br1,br2",
     "deviceID": "0000:03:02.0",
     "mac": "CA:FE:C0:FF:EE:00",
     "vlan": 1000,

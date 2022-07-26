@@ -1,14 +1,20 @@
 package utils
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/vishvananda/netlink"
 )
 
+const (
+	linkTypeBridge = "bridge"
+)
+
 // Netlink represents limited subset of functions from netlink package
 type Netlink interface {
 	LinkByName(string) (netlink.Link, error)
+	LinkByIndex(index int) (netlink.Link, error)
 	LinkSetVfHardwareAddr(netlink.Link, int, net.HardwareAddr) error
 	LinkSetHardwareAddr(netlink.Link, net.HardwareAddr) error
 	LinkSetUp(netlink.Link) error
@@ -29,6 +35,11 @@ type NetlinkWrapper struct {
 // LinkByName is a wrapper for netlink.LinkByName
 func (n *NetlinkWrapper) LinkByName(name string) (netlink.Link, error) {
 	return netlink.LinkByName(name)
+}
+
+// LinkByIndex is a wrapper for netlink.LinkByIndex
+func (n *NetlinkWrapper) LinkByIndex(index int) (netlink.Link, error) {
+	return netlink.LinkByIndex(index)
 }
 
 // LinkSetVfHardwareAddr is a wrapper for netlink.LinkSetVfHardwareAddr
@@ -107,4 +118,27 @@ func BridgeTrunkVlanAdd(nlink Netlink, link netlink.Link, vlans []int) error {
 		}
 	}
 	return nil
+}
+
+// GetParentBridgeForLink returns linux bridge if provided link belongs to any.
+// if provided link has a parent interface (e.g. interface is a part of a bond) will return a bridge
+// to which parent interface belongs to
+func GetParentBridgeForLink(nLink Netlink, link netlink.Link) (netlink.Link, error) {
+	master := link
+	var err error
+	for master.Type() != linkTypeBridge {
+		master, err = getMasterInterface(nLink, master)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return master, nil
+}
+
+// getMasterInterface returns a master interface for the link if it exists
+func getMasterInterface(nLink Netlink, link netlink.Link) (netlink.Link, error) {
+	if link.Attrs().MasterIndex == 0 {
+		return nil, fmt.Errorf("link %s has no master", link.Attrs().Name)
+	}
+	return nLink.LinkByIndex(link.Attrs().MasterIndex)
 }

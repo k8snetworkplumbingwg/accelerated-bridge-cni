@@ -336,10 +336,11 @@ var _ = Describe("Manager", func() {
 					DeviceID: "0000:af:06.0",
 					Vlan:     100,
 				},
-				Representor: "dummylink",
-				PFName:      "enp175s0f1",
-				VFID:        0,
-				Trunk:       []int{4, 6},
+				Representor:  "dummylink",
+				PFName:       "enp175s0f1",
+				ActualBridge: "bridge1",
+				VFID:         0,
+				Trunk:        []int{4, 6},
 			}
 			// Mute logger
 			zerolog.SetGlobalLevel(zerolog.Disabled)
@@ -357,7 +358,7 @@ var _ = Describe("Manager", func() {
 				MTU:         origMtu,
 			}}
 
-			mockedNl.On("LinkByName", netconf.Bridge).Return(fakeBridge, nil)
+			mockedNl.On("LinkByName", netconf.ActualBridge).Return(fakeBridge, nil)
 			mockedNl.On("LinkByName", netconf.Representor).Return(fakeLink, nil)
 			mockedSr.On("GetVfRepresentor", netconf.PFName, netconf.VFID).Return(fakeLink.Name, nil)
 			mockedNl.On("LinkSetUp", fakeLink).Return(nil)
@@ -389,7 +390,7 @@ var _ = Describe("Manager", func() {
 				MasterIndex: 0,
 			}}
 
-			mockedNl.On("LinkByName", netconf.Bridge).Return(fakeBridge, nil)
+			mockedNl.On("LinkByName", netconf.ActualBridge).Return(fakeBridge, nil)
 			mockedNl.On("LinkByName", netconf.Representor).Return(fakeLink, nil)
 			mockedSr.On("GetVfRepresentor", netconf.PFName, netconf.VFID).Return(fakeLink.Name, nil)
 			mockedNl.On("LinkSetUp", fakeLink).Return(nil)
