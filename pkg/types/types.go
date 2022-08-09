@@ -31,6 +31,7 @@ type NetConf struct {
 	// enable debug logging
 	Debug bool `json:"debug,omitempty"`
 	// bridge used to attach representor to it, default is "cni0"
+	// can contain comma separated list, e.g. bridge1,bridge2
 	Bridge string `json:"bridge,omitempty"`
 	// VLAN ID for VF
 	Vlan int `json:"vlan,omitempty"`
@@ -58,6 +59,8 @@ type PluginConf struct {
 	OrigRepState RepState `json:"orig_rep_state"`
 	// Name of the PF to which VF belongs
 	PFName string `json:"pf_name"`
+	// ActualBridge is a linux bridge name to which PF is attached
+	ActualBridge string `json:"actual_bridge"`
 	// MAC which should be set for VF
 	MAC string `json:"mac"`
 	// MTU for VF and representor

@@ -23,14 +23,14 @@ type Manager interface {
 }
 
 type manager struct {
-	nLink Netlink
+	nLink utils.Netlink
 	sriov utils.SriovnetProvider
 }
 
 // NewManager returns an instance of manager
 func NewManager() Manager {
 	return &manager{
-		nLink: &netlinkWrapper{},
+		nLink: &utils.NetlinkWrapper{},
 		sriov: &utils.SriovnetWrapper{},
 	}
 }
@@ -238,9 +238,9 @@ func (m *manager) ResetVFConfig(conf *types.PluginConf) error {
 }
 
 func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
-	bridge, err := m.nLink.LinkByName(conf.Bridge)
+	bridge, err := m.nLink.LinkByName(conf.ActualBridge)
 	if err != nil {
-		return fmt.Errorf("failed to get bridge link %s: %v", conf.Bridge, err)
+		return fmt.Errorf("failed to get bridge link %s: %v", conf.ActualBridge, err)
 	}
 
 	conf.Representor, err = m.sriov.GetVfRepresentor(conf.PFName, conf.VFID)
@@ -258,14 +258,14 @@ func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 		if err = m.nLink.LinkSetMTU(rep, conf.MTU); err != nil {
 			return fmt.Errorf("failed to set MTU on representor %s: %v", conf.Representor, err)
 		}
-		log.Info().Msgf("Setting MTU %d on rep %s to the bridge %s", conf.MTU, conf.Representor, conf.Bridge)
+		log.Info().Msgf("Setting MTU %d on rep %s to the bridge %s", conf.MTU, conf.Representor, conf.ActualBridge)
 	}
 
 	if err = m.nLink.LinkSetUp(rep); err != nil {
 		return fmt.Errorf("failed to set representor %s up: %v", conf.Representor, err)
 	}
 
-	log.Info().Msgf("Attaching rep %s to the bridge %s", conf.Representor, conf.Bridge)
+	log.Info().Msgf("Attaching rep %s to the bridge %s", conf.Representor, conf.ActualBridge)
 
 	if err = m.nLink.LinkSetMaster(rep, bridge); err != nil {
 		return fmt.Errorf("failed to add representor %s to bridge: %v", conf.Representor, err)
@@ -280,19 +280,19 @@ func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 	// if VF has any VLAN config we should remove default vlan on port
 	// if VLAN 1 explicitly requested we should not remove it from the port
 	if conf.Vlan > 1 || len(conf.Trunk) > 0 {
-		if err = bridgePVIDVlanDel(m.nLink, rep, 1); err != nil {
+		if err = utils.BridgePVIDVlanDel(m.nLink, rep, 1); err != nil {
 			return fmt.Errorf("failed to remove default VLAN(1) for representor %s: %v", conf.Representor, err)
 		}
 	}
 
 	if len(conf.Trunk) > 0 {
-		if err = bridgeTrunkVlanAdd(m.nLink, rep, conf.Trunk); err != nil {
+		if err = utils.BridgeTrunkVlanAdd(m.nLink, rep, conf.Trunk); err != nil {
 			return fmt.Errorf("failed to add trunk VLAN for representor %s: %v", conf.Representor, err)
 		}
 	}
 
 	if conf.Vlan > 0 {
-		if err = bridgePVIDVlanAdd(m.nLink, rep, conf.Vlan); err != nil {
+		if err = utils.BridgePVIDVlanAdd(m.nLink, rep, conf.Vlan); err != nil {
 			return fmt.Errorf("failed to set VLAN for representor %s: %v", conf.Representor, err)
 		}
 	}
@@ -318,6 +318,6 @@ func (m *manager) DetachRepresentor(conf *types.PluginConf) error {
 		log.Info().Msgf("Restoring MTU %d on rep %s", conf.OrigRepState.MTU, conf.Representor)
 	}
 
-	log.Info().Msgf("Detaching rep %s from the bridge %s", conf.Representor, conf.Bridge)
+	log.Info().Msgf("Detaching rep %s from the bridge %s", conf.Representor, conf.ActualBridge)
 	return m.nLink.LinkSetNoMaster(rep)
 }

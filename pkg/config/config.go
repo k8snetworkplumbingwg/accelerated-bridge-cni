@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	localtypes "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
@@ -19,17 +20,20 @@ type Loader interface {
 
 // NewConfig create and initialize Config struct
 func NewConfig() *Config {
-	return &Config{sriovnetProvider: &utils.SriovnetWrapper{}}
+	return &Config{
+		sriovnetProvider: &utils.SriovnetWrapper{},
+		netlink:          &utils.NetlinkWrapper{},
+	}
 }
 
 // Config provides function to load and parse cni configuration
 type Config struct {
 	sriovnetProvider utils.SriovnetProvider
+	netlink          utils.Netlink
 }
 
 // LoadConf load data from stdin to NetConf object
 func (c *Config) LoadConf(bytes []byte, netConf *localtypes.NetConf) error {
-	netConf.Bridge = DefaultBridge
 	if err := json.Unmarshal(bytes, netConf); err != nil {
 		return fmt.Errorf("failed to load netconf: %v", err)
 	}
@@ -55,6 +59,11 @@ func (c *Config) ParseConf(bytes []byte, conf *localtypes.PluginConf) error {
 	conf.PFName, conf.VFID, err = c.getVfInfo(conf.DeviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get VF information: %q", err)
+	}
+
+	err = c.handleBridgeConfig(conf)
+	if err != nil {
+		return err
 	}
 
 	// Assuming VF is netdev interface; Get interface name
@@ -101,4 +110,61 @@ func (c *Config) getVfInfo(vfPci string) (string, int, error) {
 	}
 
 	return pf, vfID, nil
+}
+
+// handleBridgeConfig checks CNI bridge configuration and set ActualBridge options for PluginConfig.
+// If config.Bridge option is empty, config.ActualBridge will be the value of DefaultBridge const.
+// If config.Bridge option contains one bridge name, config.ActualBridge will be that bridge.
+// If config.Bridge option contains a list of bridges, then auto-detect logic will be used,
+// and the function will iterate over configured bridges and check to which bridge uplink is connected.
+// Uplink should be added to one of the bridges when multiple bridges are set in config,
+// this is required for auto-detect logic.
+// When a single bridge is specified in plugin configuration there will be no validation that
+// uplink is a part of a bridge, this is required for backward compatibility.
+func (c *Config) handleBridgeConfig(conf *localtypes.PluginConf) error {
+	if conf.Bridge == "" {
+		conf.Bridge = DefaultBridge
+	}
+	bridgeNamesInConf := strings.Split(conf.Bridge, ",")
+	allowedBridgeNames := make([]string, 0, len(bridgeNamesInConf))
+	for _, brName := range bridgeNamesInConf {
+		brName = strings.TrimSpace(brName)
+		if brName == "" {
+			return fmt.Errorf("bridge configuration option has invalid format")
+		}
+		allowedBridgeNames = append(allowedBridgeNames, brName)
+	}
+	if len(allowedBridgeNames) == 0 {
+		return fmt.Errorf("bridge configuration option has invalid format")
+	}
+
+	if len(allowedBridgeNames) == 1 {
+		// single bridge in config, skip bridge auto detect logic
+		conf.ActualBridge = allowedBridgeNames[0]
+		return nil
+	}
+
+	pfLink, err := c.netlink.LinkByName(conf.PFName)
+	if err != nil {
+		return fmt.Errorf("failed to get link info for uplink %s: %q", conf.PFName, err)
+	}
+
+	pfBridgeLink, err := utils.GetParentBridgeForLink(c.netlink, pfLink)
+	if err != nil {
+		return fmt.Errorf("failed to get parent bridge for uplink %s: %q", conf.PFName, err)
+	}
+
+	for _, allowedBridge := range allowedBridgeNames {
+		if pfBridgeLink.Attrs().Name == allowedBridge {
+			conf.ActualBridge = pfBridgeLink.Attrs().Name
+			break
+		}
+	}
+
+	if conf.ActualBridge == "" {
+		return fmt.Errorf("uplink %s is attached to %s bridge, "+
+			"expected to be attached to one of the following bridges: %q",
+			conf.PFName, pfBridgeLink.Attrs().Name, allowedBridgeNames)
+	}
+	return nil
 }

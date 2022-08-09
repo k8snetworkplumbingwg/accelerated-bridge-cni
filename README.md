@@ -29,6 +29,15 @@ A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allo
 
 Accelerated Bridge plugin assumes that Linux Bridge is already exist and correctly configured on nodes.
 
+Accelerated bridge CNI supports automatic Linux bridge selection if multiple bridges are set in the configuration.
+The Plugin checks to which Linux bridge uplink for VF is attached and uses that bridge to add a VF representor.
+Automatic bridge selection logic requires uplink to be added to a bridge before calling the CNI.
+
+Supported configurations for auto bridge selection:
+* uplink is a direct member of a Linux bridge
+* uplink is a part of a bond interface, bond interface is a member of a Linux bridge
+
+
 CNI plugin also supports VF bound to userspace driver (currently only vfio-pci) which may be utilized
 for virtualization use-case i.e [KubeVirt](https://github.com/kubevirt/kubevirt).
 If CNI plugin detects that VF bounded to a userspace driver, it will skip step with VF netdev configuration.
