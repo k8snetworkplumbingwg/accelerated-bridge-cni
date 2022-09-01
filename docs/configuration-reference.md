@@ -18,6 +18,8 @@ The Accelerated Bridge CNI configures networks through a CNI spec configuration 
   Value must be an array of objects with trunk config, e.g.
   `[{"id": 42}, {"minID": 100, "maxID": 105}, {"id": 198, "minID": 200, "maxID": 210}]`,
   which means that trunk will allow folowing VLANs 42,100-105,198,200-210
+* `setUplinkVlan` (bool, optional): In addition to assigning VLANs to the VF, also assign those VLANs to the bridge's
+  uplink port. The uplink may be either the PF (physical function) of the allocated VF or a bond interface in case the PF is part of a bond.
 * `runtimeConfig` (dictionary, optional): CNI RuntimeConfig,
   `runtimeConfig.mac` is the only supported option for now, it takes precedence over top-level `mac` option;
   e.g. `runtimeConfig: {"mac": "CA:FE:C0:FF:EE:00"}`
@@ -33,8 +35,19 @@ native VLAN for VF. This means that bridge will add tag from `vlan` option to
 all untagged frames from VF and allow VF to send and receive tagged frames with tags from `trunk` option.
 
 
+When a VF with VLANs are added and the `setUplinkVlan` option is set, the CNI will attempt to discover if the
+cooresponding uplink PF is part of a bonded interface, and if so use that to apply additional
+"allowed" ingress VLANs. This way externally tagged traffic can be allowed into the bridge for that VF.
+Note that when removing VF this option will also remove VLANs from the uplink/bond,
+but only if there are not other VF using those VLANs.  This removal attempt is only performed when PODs are cleanly
+removed and the CNI has the chance to remove the uplink VLANs.  If for whatever reason the POD is forcefullly killed
+and the CNI not given the chance to remove these VLANs, they would be left on the uplink.  In this regard uplink
+VLAN removal should be considered as a "best effort" attempt.
+
+
 _Note: The CNI assumes the bridge is present and configured. 
-It does not manage other bridge configuration (e.g vlan_filtering option) or any uplink configurations._
+It does not manage other bridge configuration (e.g vlan_filtering option) or any uplink configurations, unless configured
+to do so with the `setUplinkVlan` option._
 
 
 An Accelerated Bridge CNI config with each field filled out looks like:
