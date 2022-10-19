@@ -23,7 +23,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: kube-accelerated-bridge-cni
-        image: ghcr.io/k8snetworkplumbingwg/accelerated-bridge-cni:0.3.0
+        image: ghcr.io/k8snetworkplumbingwg/accelerated-bridge-cni:0.4.0
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
