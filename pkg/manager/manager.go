@@ -339,7 +339,7 @@ func (m *manager) addUplinkVlans(conf *types.PluginConf) error {
 	}
 
 	vlanUplinkLock := flock.New(vlanUplinkLockFile)
-	locked, err := vlanUplinkLock.TryLock()
+	err = vlanUplinkLock.Lock()
 	if err != nil {
 		return fmt.Errorf("failed to create uplink VLAN removal file lock: %s, %v", vlanUplinkLockFile, err)
 	}
@@ -347,13 +347,9 @@ func (m *manager) addUplinkVlans(conf *types.PluginConf) error {
 		_ = vlanUplinkLock.Unlock()
 	}()
 
-	if locked {
-		log.Info().Msgf("Setting VLANs for uplink %s: %v", uplink.Attrs().Name, vlans)
-		if err = utils.BridgeTrunkVlanAdd(m.nLink, uplink, vlans); err != nil {
-			return fmt.Errorf("failed to add VLANs to interface %s: %v - %v", uplink.Attrs().Name, vlans, err)
-		}
-	} else {
-		return fmt.Errorf("failed to acquire uplink VLAN file lock: %s, %v", vlanUplinkLockFile, err)
+	log.Info().Msgf("Setting VLANs for uplink %s: %v", uplink.Attrs().Name, vlans)
+	if err = utils.BridgeTrunkVlanAdd(m.nLink, uplink, vlans); err != nil {
+		return fmt.Errorf("failed to add VLANs to interface %s: %v - %v", uplink.Attrs().Name, vlans, err)
 	}
 
 	return nil
@@ -424,7 +420,7 @@ func (m *manager) deleteUplinkVlans(conf *types.PluginConf) error {
 	}
 
 	vlanUplinkLock := flock.New(vlanUplinkLockFile)
-	locked, err := vlanUplinkLock.TryLock()
+	err = vlanUplinkLock.Lock()
 	if err != nil {
 		return fmt.Errorf("failed to create uplink VLAN file lock: %s, %v", vlanUplinkLockFile, err)
 	}
@@ -432,31 +428,27 @@ func (m *manager) deleteUplinkVlans(conf *types.PluginConf) error {
 		_ = vlanUplinkLock.Unlock()
 	}()
 
-	if locked {
-		var currentbrif []netlink.Link
-		currentbrif, err = utils.GetBridgeLinks(m.nLink, bridgeLink)
-		if err != nil {
-			return fmt.Errorf("failed to get bridge interfaces:%s: %v",
-				bridgeLink.Attrs().Name, err)
-		}
+	var currentbrif []netlink.Link
+	currentbrif, err = utils.GetBridgeLinks(m.nLink, bridgeLink)
+	if err != nil {
+		return fmt.Errorf("failed to get bridge interfaces:%s: %v",
+			bridgeLink.Attrs().Name, err)
+	}
 
-		// remove the uplink from the list of interfaces.  we only want to check for
-		// other rep ports using these vlans
-		var repbrif []netlink.Link
-		for _, link := range currentbrif {
-			if link.Attrs().Index != uplink.Attrs().Index {
-				repbrif = append(repbrif, link)
-			}
+	// remove the uplink from the list of interfaces.  we only want to check for
+	// other rep ports using these vlans
+	var repbrif []netlink.Link
+	for _, link := range currentbrif {
+		if link.Attrs().Index != uplink.Attrs().Index {
+			repbrif = append(repbrif, link)
 		}
+	}
 
-		delvlans := m.getUnusedVlanList(repbrif, vlans)
+	delvlans := m.getUnusedVlanList(repbrif, vlans)
 
-		log.Info().Msgf("Deleting VLANs for uplink %s: %v", uplink.Attrs().Name, delvlans)
-		if err = utils.BridgeTrunkVlanDel(m.nLink, uplink, delvlans); err != nil {
-			return fmt.Errorf("failed to delete VLANs from interface %s: %v - %v", uplink.Attrs().Name, delvlans, err)
-		}
-	} else {
-		return fmt.Errorf("failed to acquire uplink VLAN file lock: %s, %v", vlanUplinkLockFile, err)
+	log.Info().Msgf("Deleting VLANs for uplink %s: %v", uplink.Attrs().Name, delvlans)
+	if err = utils.BridgeTrunkVlanDel(m.nLink, uplink, delvlans); err != nil {
+		return fmt.Errorf("failed to delete VLANs from interface %s: %v - %v", uplink.Attrs().Name, delvlans, err)
 	}
 
 	return nil
