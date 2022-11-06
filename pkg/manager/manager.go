@@ -3,6 +3,8 @@ package manager
 import (
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/gofrs/flock"
@@ -15,8 +17,40 @@ import (
 )
 
 const (
-	vlanUplinkLockFile = "/tmp/accelerated-bridge-cni.lock"
+	vlanUplinkLockFile = "/var/lib/cni/accelerated-bridge/vlan-uplink.lock"
 )
+
+// IPCLock provides a way to lock and unlock around critical sections given each CNI instance
+// runs as a separate process.  Currently this is with a lockfile.
+type IPCLock interface {
+	Lock() error
+	Unlock() error
+}
+
+type ipclock struct {
+	lock *flock.Flock
+}
+
+// NewIPClock returns an instance of ipclock, which itself is a wrapper around a lockfile
+// capable of being used with flock()
+func NewIPCLock(lockfile string) IPCLock {
+	return ipclock{
+		lock: flock.New(lockfile),
+	}
+}
+
+func (l ipclock) Lock() error {
+	dirpath := filepath.Dir(l.lock.Path())
+	if err := os.MkdirAll(dirpath, 0700); err != nil {
+		return fmt.Errorf("failed to create lock directory(%q): %v", dirpath, err)
+	}
+
+	return l.lock.Lock()
+}
+
+func (l ipclock) Unlock() error {
+	return l.lock.Unlock()
+}
 
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
@@ -29,15 +63,17 @@ type Manager interface {
 }
 
 type manager struct {
-	nLink utils.Netlink
-	sriov utils.SriovnetProvider
+	nLink          utils.Netlink
+	sriov          utils.SriovnetProvider
+	vlanUplinkLock IPCLock
 }
 
 // NewManager returns an instance of manager
 func NewManager() Manager {
 	return &manager{
-		nLink: &utils.NetlinkWrapper{},
-		sriov: &utils.SriovnetWrapper{},
+		nLink:          &utils.NetlinkWrapper{},
+		sriov:          &utils.SriovnetWrapper{},
+		vlanUplinkLock: NewIPCLock(vlanUplinkLockFile),
 	}
 }
 
@@ -338,13 +374,12 @@ func (m *manager) addUplinkVlans(conf *types.PluginConf) error {
 		vlans = append(vlans, conf.Vlan)
 	}
 
-	vlanUplinkLock := flock.New(vlanUplinkLockFile)
-	err = vlanUplinkLock.Lock()
+	err = m.vlanUplinkLock.Lock()
 	if err != nil {
 		return fmt.Errorf("failed to create uplink VLAN removal file lock: %s, %v", vlanUplinkLockFile, err)
 	}
 	defer func() {
-		_ = vlanUplinkLock.Unlock()
+		_ = m.vlanUplinkLock.Unlock()
 	}()
 
 	log.Info().Msgf("Setting VLANs for uplink %s: %v", uplink.Attrs().Name, vlans)
@@ -419,13 +454,12 @@ func (m *manager) deleteUplinkVlans(conf *types.PluginConf) error {
 			uplink.Attrs().Name, uplink.Attrs().MasterIndex, err)
 	}
 
-	vlanUplinkLock := flock.New(vlanUplinkLockFile)
-	err = vlanUplinkLock.Lock()
+	err = m.vlanUplinkLock.Lock()
 	if err != nil {
 		return fmt.Errorf("failed to create uplink VLAN file lock: %s, %v", vlanUplinkLockFile, err)
 	}
 	defer func() {
-		_ = vlanUplinkLock.Unlock()
+		_ = m.vlanUplinkLock.Unlock()
 	}()
 
 	var currentbrif []netlink.Link

@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"net"
+	"os"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	. "github.com/onsi/ginkgo"
@@ -12,6 +13,7 @@ import (
 	"github.com/vishvananda/netlink"
 	nl "github.com/vishvananda/netlink/nl"
 
+	mgrMocks "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/manager/mocks"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 	utilsMocks "github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils/mocks"
 )
@@ -76,6 +78,58 @@ func (l *FakeBondLink) Attrs() *netlink.LinkAttrs {
 func (l *FakeBondLink) Type() string {
 	return "bond"
 }
+
+var _ = Describe("IPCLock", func() {
+	Context("Checking Lock/Unlock functions", func() {
+		testpath := "/tmp/accel-br-locktest/"
+		BeforeEach(func() {
+			err := os.MkdirAll(testpath, 0700)
+			check(err)
+		})
+		AfterEach(func() {
+			err := os.RemoveAll(testpath)
+			check(err)
+		})
+		It("Lock/Unlock file with existing path (success)", func() {
+			lock := NewIPCLock(testpath + "flock.lock")
+			err1 := lock.Lock()
+			err2 := lock.Unlock()
+			Expect(err1).NotTo(HaveOccurred())
+			Expect(err2).NotTo(HaveOccurred())
+		})
+		It("Lock/Unlock file with new path (success)", func() {
+			lock := NewIPCLock(testpath + "subdir/flock.lock")
+			err1 := lock.Lock()
+			err2 := lock.Unlock()
+			Expect(err1).NotTo(HaveOccurred())
+			Expect(err2).NotTo(HaveOccurred())
+		})
+		It("Lock file with existing path but no permission (failed)", func() {
+			err := os.Chmod(testpath, 0400)
+			check(err)
+			lock := NewIPCLock(testpath + "flock.lock")
+			err1 := lock.Lock()
+			Expect(err1).To(HaveOccurred())
+		})
+		It("Lock with new path but no permission (failed)", func() {
+			err := os.Chmod(testpath, 0400)
+			check(err)
+			lock := NewIPCLock(testpath + "subdir/flock.lock")
+			err1 := lock.Lock()
+			Expect(err1).To(HaveOccurred())
+		})
+		It("Unlock non-existing file with existing path (should be a no-op) (success)", func() {
+			lock := NewIPCLock(testpath + "flock.lock")
+			err1 := lock.Unlock()
+			Expect(err1).ToNot(HaveOccurred())
+		})
+		It("Unlock non-existing file with non-existing path (should be a no-op) (success)", func() {
+			lock := NewIPCLock(testpath + "subdir/flock.lock")
+			err1 := lock.Unlock()
+			Expect(err1).ToNot(HaveOccurred())
+		})
+	})
+})
 
 var _ = Describe("Manager", func() {
 	var (
@@ -422,6 +476,7 @@ var _ = Describe("Manager", func() {
 			netconf.SetUplinkVlan = true
 			mockedNl := &utilsMocks.Netlink{}
 			mockedSr := &utilsMocks.Sriovnet{}
+			mockedLock := &mgrMocks.IPCLock{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
@@ -453,11 +508,13 @@ var _ = Describe("Manager", func() {
 			mockedNl.On("LinkByName", netconf.PFName).Return(fakeUpLink, nil)
 			// link is not part of a bond
 			mockedNl.On("LinkByIndex", fakeUpLink.Attrs().MasterIndex).Return(fakeBridge, nil)
+			mockedLock.On("Lock").Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeUpLink, uint16(100), false, false, false, true).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeUpLink, uint16(4), false, false, false, true).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeUpLink, uint16(6), false, false, false, true).Return(nil)
+			mockedLock.On("Unlock").Return(nil)
 
-			m := manager{nLink: mockedNl, sriov: mockedSr}
+			m := manager{nLink: mockedNl, sriov: mockedSr, vlanUplinkLock: mockedLock}
 			err := m.AttachRepresentor(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fakeUpLink.Attrs().MasterIndex).To(Equal(fakeBridge.Attrs().Index))
@@ -471,6 +528,7 @@ var _ = Describe("Manager", func() {
 			netconf.SetUplinkVlan = true
 			mockedNl := &utilsMocks.Netlink{}
 			mockedSr := &utilsMocks.Sriovnet{}
+			mockedLock := &mgrMocks.IPCLock{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
@@ -509,11 +567,13 @@ var _ = Describe("Manager", func() {
 			mockedNl.On("LinkByName", netconf.PFName).Return(fakeUpLink, nil)
 			// link is part of a bond
 			mockedNl.On("LinkByIndex", fakeUpLink.Attrs().MasterIndex).Return(fakeBondUpLink, nil)
+			mockedLock.On("Lock").Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeBondUpLink, uint16(100), false, false, false, true).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeBondUpLink, uint16(4), false, false, false, true).Return(nil)
 			mockedNl.On("BridgeVlanAdd", fakeBondUpLink, uint16(6), false, false, false, true).Return(nil)
+			mockedLock.On("Unlock").Return(nil)
 
-			m := manager{nLink: mockedNl, sriov: mockedSr}
+			m := manager{nLink: mockedNl, sriov: mockedSr, vlanUplinkLock: mockedLock}
 			err := m.AttachRepresentor(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fakeBondUpLink.Attrs().MasterIndex).To(Equal(fakeBridge.Attrs().Index))
@@ -570,6 +630,7 @@ var _ = Describe("Manager", func() {
 		It("Detaching dummy link from the bridge and removing uplink vlans (success)", func() {
 			netconf.SetUplinkVlan = true
 			mocked := &utilsMocks.Netlink{}
+			mockedLock := &mgrMocks.IPCLock{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
@@ -603,13 +664,15 @@ var _ = Describe("Manager", func() {
 			mocked.On("LinkByName", netconf.PFName).Return(fakeUpLink, nil)
 			// link is not part of a bond
 			mocked.On("LinkByIndex", fakeUpLink.Attrs().MasterIndex).Return(fakeBridge, nil)
+			mockedLock.On("Lock").Return(nil)
 			mocked.On("LinkList").Return([]netlink.Link{fakeLink, fakeUpLink}, nil)
 			mocked.On("BridgeVlanList").Return(fakeVlanInfo, nil)
 			mocked.On("BridgeVlanDel", fakeUpLink, uint16(100), false, false, false, true).Return(nil)
 			mocked.On("BridgeVlanDel", fakeUpLink, uint16(4), false, false, false, true).Return(nil)
 			mocked.On("BridgeVlanDel", fakeUpLink, uint16(6), false, false, false, true).Return(nil)
+			mockedLock.On("Unlock").Return(nil)
 
-			m := manager{nLink: mocked}
+			m := manager{nLink: mocked, vlanUplinkLock: mockedLock}
 			err := m.DetachRepresentor(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fakeLink.Attrs().MasterIndex).To(Equal(0))
@@ -618,6 +681,7 @@ var _ = Describe("Manager", func() {
 		It("Detaching dummy link from the bridge and removing bond uplink vlans (success)", func() {
 			netconf.SetUplinkVlan = true
 			mocked := &utilsMocks.Netlink{}
+			mockedLock := &mgrMocks.IPCLock{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
@@ -658,13 +722,15 @@ var _ = Describe("Manager", func() {
 			// link is part of a bond
 			mocked.On("LinkByIndex", fakeUpLink.Attrs().MasterIndex).Return(fakeBondUpLink, nil)
 			mocked.On("LinkByIndex", fakeBondUpLink.Attrs().MasterIndex).Return(fakeBridge, nil)
+			mockedLock.On("Lock").Return(nil)
 			mocked.On("LinkList").Return([]netlink.Link{fakeLink, fakeBondUpLink}, nil)
 			mocked.On("BridgeVlanList").Return(fakeVlanInfo, nil)
 			mocked.On("BridgeVlanDel", fakeBondUpLink, uint16(100), false, false, false, true).Return(nil)
 			mocked.On("BridgeVlanDel", fakeBondUpLink, uint16(4), false, false, false, true).Return(nil)
 			mocked.On("BridgeVlanDel", fakeBondUpLink, uint16(6), false, false, false, true).Return(nil)
+			mockedLock.On("Unlock").Return(nil)
 
-			m := manager{nLink: mocked}
+			m := manager{nLink: mocked, vlanUplinkLock: mockedLock}
 			err := m.DetachRepresentor(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fakeLink.Attrs().MasterIndex).To(Equal(0))
@@ -673,6 +739,7 @@ var _ = Describe("Manager", func() {
 		It("Detaching dummy link from the bridge and removing bond uplink vlans with 2 in use (success)", func() {
 			netconf.SetUplinkVlan = true
 			mocked := &utilsMocks.Netlink{}
+			mockedLock := &mgrMocks.IPCLock{}
 			fakeBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "cni0"}}
 			fakeLink := &FakeLink{netlink.LinkAttrs{
 				Name:        netconf.Representor,
@@ -720,11 +787,13 @@ var _ = Describe("Manager", func() {
 			// link is part of a bond
 			mocked.On("LinkByIndex", fakeUpLink.Attrs().MasterIndex).Return(fakeBondUpLink, nil)
 			mocked.On("LinkByIndex", fakeBondUpLink.Attrs().MasterIndex).Return(fakeBridge, nil)
+			mockedLock.On("Lock").Return(nil)
 			mocked.On("LinkList").Return([]netlink.Link{fakeLink, fakeLinkOther, fakeBondUpLink}, nil)
 			mocked.On("BridgeVlanList").Return(fakeVlanInfo, nil)
 			mocked.On("BridgeVlanDel", fakeBondUpLink, uint16(4), false, false, false, true).Return(nil)
+			mockedLock.On("Unlock").Return(nil)
 
-			m := manager{nLink: mocked}
+			m := manager{nLink: mocked, vlanUplinkLock: mockedLock}
 			err := m.DetachRepresentor(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fakeLink.Attrs().MasterIndex).To(Equal(0))
