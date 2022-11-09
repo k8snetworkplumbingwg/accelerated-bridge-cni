@@ -5,10 +5,12 @@ import (
 	"net"
 
 	"github.com/vishvananda/netlink"
+	nl "github.com/vishvananda/netlink/nl"
 )
 
 const (
 	linkTypeBridge = "bridge"
+	linkTypeBond   = "bond"
 )
 
 // Netlink represents limited subset of functions from netlink package
@@ -26,6 +28,8 @@ type Netlink interface {
 	BridgeVlanAdd(netlink.Link, uint16, bool, bool, bool, bool) error
 	BridgeVlanDel(netlink.Link, uint16, bool, bool, bool, bool) error
 	LinkSetMTU(netlink.Link, int) error
+	BridgeVlanList() (map[int32][]*nl.BridgeVlanInfo, error)
+	LinkList() ([]netlink.Link, error)
 }
 
 // NetlinkWrapper wrapper for netlink package
@@ -97,6 +101,16 @@ func (n *NetlinkWrapper) BridgeVlanDel(link netlink.Link, vid uint16, pvid, unta
 	return netlink.BridgeVlanDel(link, vid, pvid, untagged, self, master)
 }
 
+// BridgeVlanList is a wrapper for netlink.BridgeVlanList
+func (n *NetlinkWrapper) BridgeVlanList() (map[int32][]*nl.BridgeVlanInfo, error) {
+	return netlink.BridgeVlanList()
+}
+
+// LinkList is a wrapper for netlink.LinkList
+func (n *NetlinkWrapper) LinkList() ([]netlink.Link, error) {
+	return netlink.LinkList()
+}
+
 // BridgePVIDVlanAdd configure port VLAN id for link
 func BridgePVIDVlanAdd(nlink Netlink, link netlink.Link, vlanID int) error {
 	// pvid, egress untagged
@@ -120,6 +134,21 @@ func BridgeTrunkVlanAdd(nlink Netlink, link netlink.Link, vlans []int) error {
 	return nil
 }
 
+// BridgeTrunkVlanDel remove vlans from trunk on link
+func BridgeTrunkVlanDel(nlink Netlink, link netlink.Link, vlans []int) error {
+	// egress tagged
+	for _, vlanID := range vlans {
+		if err := nlink.BridgeVlanDel(link, uint16(vlanID), false, false, false, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func BridgeVlanList(nlink Netlink) (map[int32][]*nl.BridgeVlanInfo, error) {
+	return nlink.BridgeVlanList()
+}
+
 // GetParentBridgeForLink returns linux bridge if provided link belongs to any.
 // if provided link has a parent interface (e.g. interface is a part of a bond) will return a bridge
 // to which parent interface belongs to
@@ -133,6 +162,36 @@ func GetParentBridgeForLink(nLink Netlink, link netlink.Link) (netlink.Link, err
 		}
 	}
 	return master, nil
+}
+
+// GetParentBondForLink returns the parent bonded interface if provided link is member of a bond.
+func GetParentBondForLink(nLink Netlink, link netlink.Link) (netlink.Link, error) {
+	master, err := getMasterInterface(nLink, link)
+	if err != nil {
+		return nil, err
+	}
+	if master.Type() != linkTypeBond {
+		return nil, fmt.Errorf("link %s is not a bond member", link.Attrs().Name)
+	}
+	return master, nil
+}
+
+// GetBridgeLinks returns list of netlink.Links that are part of the provided bridge
+func GetBridgeLinks(nLink Netlink, bridge netlink.Link) ([]netlink.Link, error) {
+	allInfList, err := nLink.LinkList()
+	var brInfList []netlink.Link
+
+	if err != nil {
+		return nil, fmt.Errorf("cannot get interface list! %v", err)
+	}
+
+	for _, brif := range allInfList {
+		if brif.Attrs().MasterIndex == bridge.Attrs().Index {
+			brInfList = append(brInfList, brif)
+		}
+	}
+
+	return brInfList, nil
 }
 
 // getMasterInterface returns a master interface for the link if it exists

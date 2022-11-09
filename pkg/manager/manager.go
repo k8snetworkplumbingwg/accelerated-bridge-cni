@@ -3,14 +3,54 @@ package manager
 import (
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/gofrs/flock"
 	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
+	nl "github.com/vishvananda/netlink/nl"
 
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/types"
 	"github.com/k8snetworkplumbingwg/accelerated-bridge-cni/pkg/utils"
 )
+
+const (
+	vlanUplinkLockFile = "/var/lib/cni/accelerated-bridge/vlan-uplink.lock"
+)
+
+// IPCLock provides a way to lock and unlock around critical sections given each CNI instance
+// runs as a separate process.  Currently this is with a lockfile.
+type IPCLock interface {
+	Lock() error
+	Unlock() error
+}
+
+type ipclock struct {
+	lock *flock.Flock
+}
+
+// NewIPClock returns an instance of ipclock, which itself is a wrapper around a lockfile
+// capable of being used with flock()
+func NewIPCLock(lockfile string) IPCLock {
+	return ipclock{
+		lock: flock.New(lockfile),
+	}
+}
+
+func (l ipclock) Lock() error {
+	dirpath := filepath.Dir(l.lock.Path())
+	if err := os.MkdirAll(dirpath, 0700); err != nil {
+		return fmt.Errorf("failed to create lock directory(%q): %v", dirpath, err)
+	}
+
+	return l.lock.Lock()
+}
+
+func (l ipclock) Unlock() error {
+	return l.lock.Unlock()
+}
 
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
@@ -23,15 +63,17 @@ type Manager interface {
 }
 
 type manager struct {
-	nLink utils.Netlink
-	sriov utils.SriovnetProvider
+	nLink          utils.Netlink
+	sriov          utils.SriovnetProvider
+	vlanUplinkLock IPCLock
 }
 
 // NewManager returns an instance of manager
 func NewManager() Manager {
 	return &manager{
-		nLink: &utils.NetlinkWrapper{},
-		sriov: &utils.SriovnetWrapper{},
+		nLink:          &utils.NetlinkWrapper{},
+		sriov:          &utils.SriovnetWrapper{},
+		vlanUplinkLock: NewIPCLock(vlanUplinkLockFile),
 	}
 }
 
@@ -286,15 +328,63 @@ func (m *manager) AttachRepresentor(conf *types.PluginConf) error {
 	}
 
 	if len(conf.Trunk) > 0 {
+		log.Info().Msgf("Setting multiple VLANs for rep %s: %v", conf.Representor, conf.Trunk)
 		if err = utils.BridgeTrunkVlanAdd(m.nLink, rep, conf.Trunk); err != nil {
 			return fmt.Errorf("failed to add trunk VLAN for representor %s: %v", conf.Representor, err)
 		}
 	}
 
 	if conf.Vlan > 0 {
+		log.Info().Msgf("Setting PVID VLAN for rep %s: %d", conf.Representor, conf.Vlan)
 		if err = utils.BridgePVIDVlanAdd(m.nLink, rep, conf.Vlan); err != nil {
 			return fmt.Errorf("failed to set VLAN for representor %s: %v", conf.Representor, err)
 		}
+	}
+
+	if conf.SetUplinkVlan {
+		if err = m.addUplinkVlans(conf); err != nil {
+			return fmt.Errorf("failed to add trunk VLANs to uplink %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (m *manager) addUplinkVlans(conf *types.PluginConf) error {
+	var uplink netlink.Link
+	var err error
+
+	uplink, err = m.nLink.LinkByName(conf.PFName)
+	if err != nil {
+		return fmt.Errorf("failed to lookup PF %s: %v", conf.PFName, err)
+	}
+
+	if bonduplink, bonderr := utils.GetParentBondForLink(m.nLink, uplink); bonderr == nil {
+		log.Debug().Msgf("Using bond master for adding uplink vlans: pf:%s - master:%s",
+			uplink.Attrs().Name, bonduplink.Attrs().Name)
+		uplink = bonduplink
+	}
+
+	var vlans []int
+	if len(conf.Trunk) > 0 {
+		vlans = conf.Trunk
+	}
+
+	if conf.Vlan > 0 {
+		vlans = append(vlans, conf.Vlan)
+	}
+
+	err = m.vlanUplinkLock.Lock()
+	if err != nil {
+		return fmt.Errorf("failed to create uplink VLAN removal file lock: %s, %v", vlanUplinkLockFile, err)
+	}
+	defer func() {
+		_ = m.vlanUplinkLock.Unlock()
+	}()
+
+	log.Info().Msgf("Setting VLANs for uplink %s: %v", uplink.Attrs().Name, vlans)
+	if err = utils.BridgeTrunkVlanAdd(m.nLink, uplink, vlans); err != nil {
+		return fmt.Errorf("failed to add VLANs to interface %s: %v - %v", uplink.Attrs().Name, vlans, err)
 	}
 
 	return nil
@@ -319,5 +409,106 @@ func (m *manager) DetachRepresentor(conf *types.PluginConf) error {
 	}
 
 	log.Info().Msgf("Detaching rep %s from the bridge %s", conf.Representor, conf.ActualBridge)
-	return m.nLink.LinkSetNoMaster(rep)
+
+	if err = m.nLink.LinkSetNoMaster(rep); err != nil {
+		return fmt.Errorf("failed to detatch representor %s from bridge: %v", conf.Representor, err)
+	}
+
+	if conf.SetUplinkVlan {
+		if err = m.deleteUplinkVlans(conf); err != nil {
+			log.Warn().Msgf("Failed to delete trunk VLANs from uplink %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (m *manager) deleteUplinkVlans(conf *types.PluginConf) error {
+	var uplink netlink.Link
+	var err error
+
+	uplink, err = m.nLink.LinkByName(conf.PFName)
+	if err != nil {
+		return fmt.Errorf("failed to lookup PF %s: %v", conf.PFName, err)
+	}
+
+	if bonduplink, bonderr := utils.GetParentBondForLink(m.nLink, uplink); bonderr == nil {
+		log.Debug().Msgf("Using bond master for removing uplink vlans: pf:%s - master:%s",
+			uplink.Attrs().Name, bonduplink.Attrs().Name)
+		uplink = bonduplink
+	}
+
+	var vlans []int
+	if len(conf.Trunk) > 0 {
+		vlans = conf.Trunk
+	}
+
+	if conf.Vlan > 0 {
+		vlans = append(vlans, conf.Vlan)
+	}
+
+	var bridgeLink netlink.Link
+	bridgeLink, err = utils.GetParentBridgeForLink(m.nLink, uplink)
+	if err != nil {
+		return fmt.Errorf("failed to lookup bridge index for interface:%s: %d %v",
+			uplink.Attrs().Name, uplink.Attrs().MasterIndex, err)
+	}
+
+	err = m.vlanUplinkLock.Lock()
+	if err != nil {
+		return fmt.Errorf("failed to create uplink VLAN file lock: %s, %v", vlanUplinkLockFile, err)
+	}
+	defer func() {
+		_ = m.vlanUplinkLock.Unlock()
+	}()
+
+	var currentbrif []netlink.Link
+	currentbrif, err = utils.GetBridgeLinks(m.nLink, bridgeLink)
+	if err != nil {
+		return fmt.Errorf("failed to get bridge interfaces:%s: %v",
+			bridgeLink.Attrs().Name, err)
+	}
+
+	// remove the uplink from the list of interfaces.  we only want to check for
+	// other rep ports using these vlans
+	var repbrif []netlink.Link
+	for _, link := range currentbrif {
+		if link.Attrs().Index != uplink.Attrs().Index {
+			repbrif = append(repbrif, link)
+		}
+	}
+
+	delvlans := m.getUnusedVlanList(repbrif, vlans)
+
+	log.Info().Msgf("Deleting VLANs for uplink %s: %v", uplink.Attrs().Name, delvlans)
+	if err = utils.BridgeTrunkVlanDel(m.nLink, uplink, delvlans); err != nil {
+		return fmt.Errorf("failed to delete VLANs from interface %s: %v - %v", uplink.Attrs().Name, delvlans, err)
+	}
+
+	return nil
+}
+
+// check if any of the interfaces in the brif list are still using the vlans in the `vlans` list argument
+func (m *manager) getUnusedVlanList(brif []netlink.Link, vlans []int) (unusedVlans []int) {
+	var allbrif map[int32][]*nl.BridgeVlanInfo
+	allbrif, _ = utils.BridgeVlanList(m.nLink)
+
+	for _, vlan := range vlans {
+		found := false
+
+	foundvlan:
+		for _, brlink := range brif {
+			for _, bvlaninfo := range allbrif[int32(brlink.Attrs().Index)] {
+				if bvlaninfo.Vid == uint16(vlan) {
+					found = true
+					break foundvlan
+				}
+			}
+		}
+		if !found {
+			unusedVlans = append(unusedVlans, vlan)
+		}
+	}
+
+	return unusedVlans
 }

@@ -37,6 +37,8 @@ type NetConf struct {
 	Vlan int `json:"vlan,omitempty"`
 	// VLAN Trunk configuration
 	Trunk []Trunk `json:"trunk"`
+	// enable setting matching vlan tags on the bridge uplink interface, default is false
+	SetUplinkVlan bool `json:"setUplinkVlan"`
 	// MAC as top level config option; required for CNIs that don't support runtimeConfig
 	MAC string `json:"mac,omitempty"`
 	// MTU for VF and representor
@@ -71,6 +73,6 @@ type PluginConf struct {
 	VFID int `json:"vfid"`
 	// VF names after in the container; used during deletion
 	ContIFNames string `json:"cont_if_names"`
-	// Internal presentation of VLAN Trunk config; we don't need this option in cache
-	Trunk []int `json:"-"`
+	// Internal presentation of VLAN Trunk config
+	Trunk []int `json:"trunk"`
 }

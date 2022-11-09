@@ -64,6 +64,10 @@ GOVERALLS = $(BINDIR)/goveralls
 $(GOVERALLS): | $(BASE) ; $(info  installing goveralls...)
 	$(call go-install-tool,$(GOVERALLS),github.com/mattn/goveralls@latest)
 
+MOCKERY = $(BINDIR)/mockery
+$(MOCKERY): | $(BASE) ; $(info  installing mockery...)
+	$(call go-install-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.10.0)
+
 # Tests
 TEST_TARGETS := test-default test-bench test-short test-verbose test-race
 .PHONY: $(TEST_TARGETS) test-xml check test tests
@@ -94,6 +98,15 @@ upload-coverage: test-coverage-tools | $(BASE) ; $(info  uploading coverage resu
 lint: | $(BASE) $(GOLANGCI_LINT) ; $(info  running golangci-lint...) @ ## Run golangci-lint
 	$Q $(GOLANGCI_LINT) run --timeout=10m
 
+# Rebuild mocks as needed
+.PHONY: mocks
+mocks: | $(BASE) $(MOCKERY) ; $(info  generating mocks...) @ ## Run mockery
+	$(MOCKERY) --all --dir pkg/manager --output pkg/manager/mocks
+	$(MOCKERY) --all --dir pkg/cache --output pkg/cache/mocks
+	$(MOCKERY) --all --dir pkg/utils --output pkg/utils/mocks
+	$(MOCKERY) --all --dir pkg/plugin --output pkg/plugin/mocks
+	$(MOCKERY) --all --dir pkg/config --output pkg/config/mocks
+
 # Docker image
 .PHONY: image
 image: | $(BASE) ; $(info Building Docker image...)
@@ -110,6 +123,7 @@ clean: ; $(info  Cleaning...)	@ ## Cleanup everything
 	@rm -rf $(BUILDDIR)
 	@rm -rf test
 	@rm -rf $(BINDIR)
+	@rm -f $(COVER_PROFILE)
 
 .PHONY: help
 help: ## Show this message
