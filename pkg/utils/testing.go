@@ -7,7 +7,6 @@
 package utils
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -78,7 +77,7 @@ var ts = tmpSysFs{
 // CreateTmpSysFs create mock sysfs for testing
 // nolint:gosec
 func CreateTmpSysFs() error {
-	tmpdir, err := ioutil.TempDir("/tmp", "accelerated-bridge-testfiles-")
+	tmpdir, err := os.MkdirTemp("/tmp", "accelerated-bridge-testfiles-")
 	if err != nil {
 		return err
 	}
