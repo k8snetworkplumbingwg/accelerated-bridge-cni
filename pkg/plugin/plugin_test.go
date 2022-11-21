@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -336,6 +337,86 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 				_ = plugin.CmdAdd(cmdArgs)
 				Expect(updatedPluginConf.MAC).To(BeIdenticalTo(testValidMAC3))
 			})
+		})
+
+		Context("Update DeviceInfo", func() {
+			var (
+				tmpFile string
+			)
+
+			BeforeEach(func() {
+				f, err := os.CreateTemp("", "accbr-deviceinfo")
+				Expect(err).NotTo(HaveOccurred())
+				tmpFile = f.Name()
+			})
+
+			AfterEach(func() {
+				Expect(os.Remove(tmpFile)).NotTo(HaveOccurred())
+			})
+
+			Context("succeed", func() {
+				var (
+					cmdCtx *cmdContext
+				)
+				BeforeEach(func() {
+					cmdCtx = &cmdContext{pluginConf: &localtypes.PluginConf{}}
+					cmdCtx.pluginConf.Representor = "eth3"
+					cmdCtx.pluginConf.RuntimeConfig.CNIDeviceInfoFile = tmpFile
+				})
+				It("unsupported spec version, should update the version", func() {
+					before := []byte(`{"version": "1.0.0", "pci": {"pci-address": "0000:d8:00.2"}}`)
+					Expect(os.WriteFile(tmpFile, before, 0600)).NotTo(HaveOccurred())
+					Expect(plugin.updateDeviceInfo(cmdCtx)).NotTo(HaveOccurred())
+					result, err := os.ReadFile(tmpFile)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result).To(MatchJSON(
+						`{"version": "1.1.0", "pci": {"pci-address": "0000:d8:00.2", "representor-device": "eth3"}}`))
+
+				})
+				It("merge DeviceInfo", func() {
+					Expect(os.WriteFile(tmpFile,
+						[]byte(`{"version": "1.1.0", "pci": {"pci-address": "0000:d8:00.2"}}`), 0600)).NotTo(HaveOccurred())
+					Expect(plugin.updateDeviceInfo(cmdCtx)).NotTo(HaveOccurred())
+					result, err := os.ReadFile(tmpFile)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result).To(MatchJSON(
+						`{"version": "1.1.0", "pci": {"pci-address": "0000:d8:00.2", "representor-device": "eth3"}}`))
+
+				})
+				It("overwrite existing representor-device, keep spec version", func() {
+					Expect(os.WriteFile(tmpFile,
+						[]byte(`{"version": "1.2.0", "pci": {"pci-address": "0000:d8:00.2", "representor-device": "eth4"}}`),
+						0600)).NotTo(HaveOccurred())
+					Expect(plugin.updateDeviceInfo(cmdCtx)).NotTo(HaveOccurred())
+					result, err := os.ReadFile(tmpFile)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result).To(MatchJSON(
+						`{"version": "1.2.0", "pci": {"pci-address": "0000:d8:00.2", "representor-device": "eth3"}}`))
+				})
+			})
+
+			It("no CNIDeviceInfoFile option", func() {
+				cmdCtx := &cmdContext{pluginConf: &localtypes.PluginConf{}}
+				Expect(plugin.updateDeviceInfo(cmdCtx)).NotTo(HaveOccurred())
+			})
+
+			It("CNIDeviceInfoFile not exist", func() {
+				cmdCtx := &cmdContext{pluginConf: &localtypes.PluginConf{}}
+				cmdCtx.pluginConf.RuntimeConfig.CNIDeviceInfoFile = "this-file-doesnt-exist-abcd"
+				Expect(plugin.updateDeviceInfo(cmdCtx)).To(HaveOccurred())
+			})
+
+			It("Unexpected DeviceInfo file format", func() {
+				cmdCtx := &cmdContext{pluginConf: &localtypes.PluginConf{}}
+				cmdCtx.pluginConf.RuntimeConfig.CNIDeviceInfoFile = tmpFile
+
+				Expect(os.WriteFile(tmpFile, []byte(`[]`), 0600)).NotTo(HaveOccurred())
+				Expect(plugin.updateDeviceInfo(cmdCtx)).To(HaveOccurred())
+
+				Expect(os.WriteFile(tmpFile, []byte(`{"pci": []}`), 0600)).NotTo(HaveOccurred())
+				Expect(plugin.updateDeviceInfo(cmdCtx)).To(HaveOccurred())
+			})
+
 		})
 	})
 	Describe("CmdDel", func() {

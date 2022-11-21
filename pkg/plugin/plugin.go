@@ -1,8 +1,10 @@
 package plugin
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -143,7 +145,85 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("failed to save PluginConf %q", err)
 	}
 
+	if err = p.updateDeviceInfo(cmdCtx); err != nil {
+		log.Error().Msgf("failed to update DeviceInfo %v.", err)
+		// this step is not critical for CNI operation, log error and continue
+	}
 	return types.PrintResult(cmdCtx.result, current.ImplementedSpecVersion)
+}
+
+// updateDeviceInfo updates CNIDeviceInfoFile file with information
+// about VF representor
+func (p *Plugin) updateDeviceInfo(cmdCtx *cmdContext) error {
+	if cmdCtx.pluginConf.RuntimeConfig.CNIDeviceInfoFile == "" {
+		return nil
+	}
+	versionKey := "version"
+	pciDevInfoKey := "pci"
+	vfRepresentorNameKey := "representor-device"
+
+	// if spec in DeviceInfo file has spec version "1.0.0", then the plugin
+	// will update spec version to "1.1.0" (minimal required spec version for representor-device field),
+	// if spec version != "1.0.0", then existing spec version field in
+	// DeviceInfo file will be preserved
+	unsupportedSpecVersion := "1.0.0"
+	minimalSpecVersion := "1.1.0"
+
+	// we use map[string]interface{}{} to unmarshal DeviceInfo JSON to avoid importing types
+	// from network-attach-definition-client package which will introduce many additional
+	// dependencies
+	devInfo := map[string]interface{}{}
+
+	bytes, err := os.ReadFile(cmdCtx.pluginConf.RuntimeConfig.CNIDeviceInfoFile)
+	if err != nil {
+		return fmt.Errorf("failed to read CNIDeviceInfoFile %q", err)
+	}
+	err = json.Unmarshal(bytes, &devInfo)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal CNIDeviceInfoFile %q", err)
+	}
+
+	versionField, exist := devInfo[versionKey]
+	if !exist {
+		return fmt.Errorf("failed to detect DeviceInfo spec version in CNIDeviceInfoFile: no version field")
+	}
+	currentVersion, ok := versionField.(string)
+	if !ok {
+		return fmt.Errorf("unexpected version field format in CNIDeviceInfoFile")
+	}
+	if currentVersion == unsupportedSpecVersion {
+		// should upgrade version to minimalSpecVersion
+		log.Debug().Msgf(
+			"update DeviceInfo spec version in CNIDeviceInfoFile to %s version", minimalSpecVersion)
+		devInfo[versionKey] = minimalSpecVersion
+	}
+
+	pciInfo, exist := devInfo[pciDevInfoKey]
+	if !exist {
+		return fmt.Errorf("pci field not found in CNIDeviceInfoFile")
+	}
+	pciInfoMap, ok := pciInfo.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("unexpected pci info format in CNIDeviceInfoFile")
+	}
+	currentValue := pciInfoMap[vfRepresentorNameKey]
+	if currentValue == cmdCtx.pluginConf.Representor {
+		// preserve existing value if already set
+		log.Debug().Msgf("representor-device already set, skip deviceInfo update")
+		return nil
+	}
+	pciInfoMap[vfRepresentorNameKey] = cmdCtx.pluginConf.Representor
+	devInfo[pciDevInfoKey] = pciInfoMap
+
+	bytes, err = json.Marshal(&devInfo)
+	if err != nil {
+		return fmt.Errorf("failed to marshal DeviceInfo to JSON %q", err)
+	}
+	err = os.WriteFile(cmdCtx.pluginConf.RuntimeConfig.CNIDeviceInfoFile, bytes, 0444)
+	if err != nil {
+		return fmt.Errorf("failed to update CNIDeviceInfoFile %q", err)
+	}
+	return nil
 }
 
 // mac address configuration can be supplied as

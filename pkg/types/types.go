@@ -46,7 +46,8 @@ type NetConf struct {
 	// PCI address of a VF in valid sysfs format
 	DeviceID      string `json:"deviceID"`
 	RuntimeConfig struct {
-		Mac string `json:"mac,omitempty"`
+		Mac               string `json:"mac,omitempty"`
+		CNIDeviceInfoFile string `json:"CNIDeviceInfoFile,omitempty"`
 	} `json:"runtimeConfig,omitempty"`
 }
 
