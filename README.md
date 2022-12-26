@@ -81,6 +81,7 @@ spec:
   "type": "accelerated-bridge",
   "cniVersion": "0.3.1",
   "name": "some-net",
+  "capabilities": {"CNIDeviceInfoFile": true},
   "ipam": {
     "type": "host-local",
     "subnet": "10.56.217.0/24",
@@ -93,6 +94,10 @@ spec:
 ```
 
 The `.spec.config` field contains the configuration information used by the Accelerated Bridge CNI.
+
+_Note: `"capabilities": {"CNIDeviceInfoFile": true}` is required if you want Multus to pass on
+[DeviceInfo file](https://github.com/k8snetworkplumbingwg/device-info-spec/blob/main/SPEC.md#4-device-information-files) 
+to the plugin. Accelerated Bridge plugin will add additional PCI device information to the file if the file is provided._
 
 ### Basic configuration parameters
 
