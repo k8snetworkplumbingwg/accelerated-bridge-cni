@@ -17,7 +17,7 @@ A `build_docker.sh` script is available for building the Accelerated Bridge CNI 
 You may wish to deploy Accelerated Bridge CNI as a daemonset, you can do so by starting with the example Daemonset shown here:
 
 ```
-$ kubectl create -f ./images/k8s-v1.16/accelerated-bridge-cni-daemonset.yaml
+$ kubectl create -f ./images/accelerated-bridge-cni-daemonset.yaml
 ```
 
 Note: The likely best practice here is to build your own image given the Dockerfile, and then push it to your preferred registry, and change the `image` fields in the Daemonset YAML to reference that image.
