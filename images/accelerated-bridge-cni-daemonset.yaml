@@ -1,5 +1,5 @@
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kube-accelerated-bridge-cni-ds-amd64
@@ -8,22 +8,26 @@ metadata:
     tier: node
     app: accelerated-bridge
 spec:
+  selector:
+    matchLabels:
+      name: accelerated-bridge-cni
   template:
     metadata:
       labels:
+        name: accelerated-bridge-cni
         tier: node
         app: accelerated-bridge
     spec:
       hostNetwork: true
       nodeSelector:
-        beta.kubernetes.io/arch: amd64
+        kubernetes.io/arch: amd64
       tolerations:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
       containers:
       - name: kube-accelerated-bridge-cni
-        image: ghcr.io/k8snetworkplumbingwg/accelerated-bridge-cni:0.4.0
+        image: ghcr.io/k8snetworkplumbingwg/accelerated-bridge-cni
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
