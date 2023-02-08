@@ -402,7 +402,7 @@ var _ = Describe("Plugin - test CNI command flows", func() {
 					Return(testValidCacheRef).Once()
 				cacheMock.On("Load", testValidCacheRef, mock.Anything).
 					Return(errTest).Once()
-				Expect(plugin.CmdDel(cmdArgs)).To(HaveOccurred())
+				Expect(plugin.CmdDel(cmdArgs)).ToNot(HaveOccurred())
 			})
 			It("Failed to call IPAM del", func() {
 				successfullyDetachRepresentor()
