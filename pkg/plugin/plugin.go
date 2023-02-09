@@ -327,7 +327,15 @@ func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
 	pluginConf := &localtypes.PluginConf{}
 	err = p.cache.Load(pRef, pluginConf)
 	if err != nil {
-		return err
+		// If cmdDel() fails, cached netconf is cleaned up by
+		// the followed defer call or might not exist in the first place.
+		// However, subsequence calls of cmdDel()
+		// from container runtime fail in a dead loop because
+		// the cached netconf doesn't exist.
+		// Return nil when cache.Load() fails since the rest
+		// of cmdDel() code relies on netconf as input argument
+		// and there is no meaning to continue.
+		return nil
 	}
 
 	if pluginConf.Debug {
