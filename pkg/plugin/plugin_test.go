@@ -8,7 +8,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/stretchr/testify/mock"
 
@@ -53,7 +53,7 @@ var (
 func getValidPluginConf() *localtypes.PluginConf {
 	return &localtypes.PluginConf{
 		NetConf: localtypes.NetConf{
-			NetConf:  types.NetConf{IPAM: testValidIPAM, Name: testValidName},
+			NetConf:  types.NetConf{CNIVersion: "0.4.0", IPAM: testValidIPAM, Name: testValidName},
 			Bridge:   testValidBridge,
 			Debug:    true,
 			DeviceID: testValidDeviceID,
@@ -81,12 +81,11 @@ func getValidCmdArgs() *skel.CmdArgs {
 func getValidIPAMResult() types.Result {
 	_, ipNet, _ := net.ParseCIDR("192.168.100.101/24")
 	ipConf := current.IPConfig{
-		Version: "4",
 		Address: *ipNet,
 		Gateway: net.ParseIP("192.168.100.1"),
 	}
 	return &current.Result{
-		CNIVersion: "0.2.0",
+		CNIVersion: "1.0.0",
 		IPs:        []*current.IPConfig{&ipConf},
 	}
 }

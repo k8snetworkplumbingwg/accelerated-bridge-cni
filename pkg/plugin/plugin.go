@@ -9,7 +9,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -149,7 +149,7 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 		log.Error().Msgf("failed to update DeviceInfo %v.", err)
 		// this step is not critical for CNI operation, log error and continue
 	}
-	return types.PrintResult(cmdCtx.result, current.ImplementedSpecVersion)
+	return types.PrintResult(cmdCtx.result, pluginConf.CNIVersion)
 }
 
 // updateDeviceInfo updates CNIDeviceInfoFile file with information
