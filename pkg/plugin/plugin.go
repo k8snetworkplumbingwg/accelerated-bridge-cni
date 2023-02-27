@@ -219,6 +219,9 @@ func (p *Plugin) updateDeviceInfo(cmdCtx *cmdContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal DeviceInfo to JSON %q", err)
 	}
+	//nolint:gosec
+	// save with same permissions as https://github.com/k8snetworkplumbingwg/network-attachment-definition-client
+	// utils.saveDeviceInfo
 	err = os.WriteFile(cmdCtx.pluginConf.RuntimeConfig.CNIDeviceInfoFile, bytes, 0444)
 	if err != nil {
 		return fmt.Errorf("failed to update CNIDeviceInfoFile %q", err)
