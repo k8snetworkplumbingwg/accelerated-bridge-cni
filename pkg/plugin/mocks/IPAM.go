@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	current "github.com/containernetworking/cni/pkg/types/current"
+	current "github.com/containernetworking/cni/pkg/types/100"
 	mock "github.com/stretchr/testify/mock"
 
 	types "github.com/containernetworking/cni/pkg/types"

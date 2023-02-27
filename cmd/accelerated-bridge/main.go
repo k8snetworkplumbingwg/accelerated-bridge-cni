@@ -23,5 +23,6 @@ func setupLogger() {
 func main() {
 	setupLogger()
 	p := plugin.NewPlugin()
-	skel.PluginMain(p.CmdAdd, p.CmdCheck, p.CmdDel, version.All, "")
+	skel.PluginMain(p.CmdAdd, p.CmdCheck, p.CmdDel,
+		version.PluginSupports("0.1.0", "0.2.0", "0.3.0", "0.3.1", "0.4.0"), "")
 }
