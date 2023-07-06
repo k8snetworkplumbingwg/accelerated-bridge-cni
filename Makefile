@@ -68,6 +68,14 @@ MOCKERY = $(BINDIR)/mockery
 $(MOCKERY): | $(BASE) ; $(info  installing mockery...)
 	$(call go-install-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.10.0)
 
+HADOLINT_TOOL = $(BINDIR)/hadolint
+$(HADOLINT_TOOL): | $(BASE) ; $(info  installing hadolint...)
+	$(call wget-install-tool,$(HADOLINT_TOOL),"https://github.com/hadolint/hadolint/releases/download/v2.12.1-beta/hadolint-Linux-x86_64")
+
+SHELLCHECK_TOOL = $(BINDIR)/shellcheck
+$(SHELLCHECK_TOOL): | $(BASE) ; $(info  installing shellcheck...)
+	$(call install-shellcheck,$(BINDIR),"https://github.com/koalaman/shellcheck/releases/download/v0.9.0/shellcheck-v0.9.0.linux.x86_64.tar.xz")
+
 # Tests
 TEST_TARGETS := test-default test-bench test-short test-verbose test-race
 .PHONY: $(TEST_TARGETS) test-xml check test tests
@@ -97,6 +105,14 @@ upload-coverage: test-coverage-tools | $(BASE) ; $(info  uploading coverage resu
 .PHONY: lint
 lint: | $(BASE) $(GOLANGCI_LINT) ; $(info  running golangci-lint...) @ ## Run golangci-lint
 	$Q $(GOLANGCI_LINT) run --timeout=10m
+
+.PHONY: hadolint
+hadolint: $(BASE) $(HADOLINT_TOOL); $(info  running hadolint...) @ ## Run hadolint
+	$Q $(HADOLINT_TOOL) Dockerfile
+
+.PHONY: shellcheck
+shellcheck: $(BASE) $(SHELLCHECK_TOOL); $(info  running shellcheck...) @ ## Run shellcheck
+	$Q $(SHELLCHECK_TOOL) images/entrypoint.sh
 
 # Rebuild mocks as needed
 .PHONY: mocks
@@ -138,3 +154,24 @@ GOBIN=$(BINDIR) go install $(2) ;\
 }
 endef
 
+define wget-install-tool
+@[ -f $(1) ] || { \
+echo "Downloading $(2)" ;\
+mkdir -p $(BINDIR);\
+wget -O $(1) $(2);\
+chmod +x $(1) ;\
+}
+endef
+
+define install-shellcheck
+@[ -f $(1) ] || { \
+echo "Downloading $(2)" ;\
+mkdir -p $(1);\
+wget -O $(1)/shellcheck.tar.xz $(2);\
+tar xf $(1)/shellcheck.tar.xz -C $(1);\
+mv $(1)/shellcheck*/shellcheck $(1)/shellcheck;\
+chmod +x $(1)/shellcheck;\
+rm -r $(1)/shellcheck*/;\
+rm $(1)/shellcheck.tar.xz;\
+}
+endef
