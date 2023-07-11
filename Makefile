@@ -68,6 +68,10 @@ MOCKERY = $(BINDIR)/mockery
 $(MOCKERY): | $(BASE) ; $(info  installing mockery...)
 	$(call go-install-tool,$(MOCKERY),github.com/vektra/mockery/v2@v2.10.0)
 
+HADOLINT_TOOL = $(BINDIR)/hadolint
+$(HADOLINT_TOOL): | $(BASE) ; $(info  installing hadolint...)
+	$(call wget-install-tool,$(HADOLINT_TOOL),"https://github.com/hadolint/hadolint/releases/download/v2.12.1-beta/hadolint-Linux-x86_64")
+
 # Tests
 TEST_TARGETS := test-default test-bench test-short test-verbose test-race
 .PHONY: $(TEST_TARGETS) test-xml check test tests
@@ -97,6 +101,10 @@ upload-coverage: test-coverage-tools | $(BASE) ; $(info  uploading coverage resu
 .PHONY: lint
 lint: | $(BASE) $(GOLANGCI_LINT) ; $(info  running golangci-lint...) @ ## Run golangci-lint
 	$Q $(GOLANGCI_LINT) run --timeout=10m
+
+.PHONY: hadolint
+hadolint: $(BASE) $(HADOLINT_TOOL); $(info  running hadolint...) @ ## Run hadolint
+	$Q $(HADOLINT_TOOL) Dockerfile
 
 # Rebuild mocks as needed
 .PHONY: mocks
@@ -138,3 +146,10 @@ GOBIN=$(BINDIR) go install $(2) ;\
 }
 endef
 
+define wget-install-tool
+@[ -f $(1) ] || { \
+echo "Downloading $(2)" ;\
+wget -O $(1) $(2);\
+chmod +x $(1) ;\
+}
+endef

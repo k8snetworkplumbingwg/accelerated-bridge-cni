@@ -10,20 +10,20 @@ BINARY_NAME="/usr/bin/accelerated-bridge"
 # Give help text for parameters.
 usage()
 {
-    /bin/echo -e "This is an entrypoint script for SR-IOV CNI to overlay its"
-    /bin/echo -e "binary into location in a filesystem. The binary file will"
-    /bin/echo -e "be copied to the corresponding directory."
-    /bin/echo -e ""
-    /bin/echo -e "./entrypoint.sh"
-    /bin/echo -e "\t-h --help"
-    /bin/echo -e "\t--cni-bin-dir=$CNI_BIN_DIR"
-    /bin/echo -e "\t--binary=$BINARY_NAME"
+    printf "This is an entrypoint script for SR-IOV CNI to overlay its\n"
+    printf "binary into location in a filesystem. The binary file will\n"
+    printf "be copied to the corresponding directory.\n"
+    printf "\n"
+    printf "./entrypoint.sh\n"
+    printf "\t-h --help\n"
+    printf "\t--cni-bin-dir=%s\n" "$CNI_BIN_DIR"
+    printf "\t--binary=%s\n" "$BINARY_NAME"
 }
 
 # Parse parameters given as arguments to this script.
 while [ "$1" != "" ]; do
-    PARAM=`echo $1 | awk -F= '{print $1}'`
-    VALUE=`echo $1 | awk -F= '{print $2}'`
+    PARAM=$(echo "$1" | awk -F= '{print $1}')
+    VALUE=$(echo "$1" | awk -F= '{print $2}')
     case $PARAM in
         -h | --help)
             usage
@@ -55,10 +55,11 @@ do
 done
 
 # Copy file into proper place.
-cp -f $BINARY_NAME $CNI_BIN_DIR
+cp -f "$BINARY_NAME" "$CNI_BIN_DIR"
 
 echo "Entering sleep... (success)"
+trap : TERM INT
 
-# Sleep forever. 
+# Sleep forever.
 # sleep infinity is not available in alpine; instead lets go sleep for ~68 years. Hopefully that's enough sleep
-sleep 2147483647
+sleep 2147483647 & wait
